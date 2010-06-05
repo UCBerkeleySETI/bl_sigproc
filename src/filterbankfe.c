@@ -217,8 +217,8 @@ main (int argc, char *argv[])
 
 
   /* hard code some values for now */
-  machine_id=9;    //-1
-  telescope_id=9;  //-1
+  machine_id=11;    //-1
+  telescope_id=10;  //-1
   data_type=1;
   nchans=128;
   foff=838.860800/4/nchans * -1.0;        // XXX hack
