@@ -13,7 +13,7 @@ using namespace std;
 
 
 float filgetmax(float *data, int arraysize){
-    float max=0; 
+    float max=data[0]; 
     int i;
     for (i=0; i<arraysize; i++){
 	if (data[i] > max){
@@ -25,7 +25,7 @@ float filgetmax(float *data, int arraysize){
 
 
 float filgetmin(float *data, int arraysize){
-    float min=99999;
+    float min=data[0];
     int i;
     for (i=0; i<arraysize; i++){
 	if (data[i] < min){
@@ -56,12 +56,12 @@ bool getkillfile(int * killmask,int nchans,char *killfile){
     }
     for (int i=0; i<nchans;i++) {
 	if (fgets(line,20,kptr)!=NULL){  // Read in whole line
-	    int nscanned = sscanf(line,"%d",&killfile[i]);
+	    int nscanned = sscanf(line,"%d",&killmask[i]);
 	    if (nscanned==0) {
 		fprintf(stderr,"GETKILLFILE: Could not scan %s as 1 or 0\nWill NOT excise RFI channels.\n",line);
 		return(false);
 	    }
-	} else{
+	} else {
 	    fprintf(stderr,"GETKILLFILE: Error reading %dth value from %s\nWill NOT excise RFI channels.\n",i,killfile);
 	    return(false);
 	}
@@ -350,6 +350,28 @@ void plotfil(float *floatarchive, int nFBsamps, long long int Sskip, float inpDM
 	dmoff = dumx - timeseriesindex[0];
 	plotdm(Sskip,dmoff,inpDM, filnchans, filtsamp, filfoff*favg, filfch1);
 	cpgsci(1);
+      }
+      if (dumchar == 'p'){
+	      cpgclos();
+
+	      snrmax = filgetmax(floatarchive,nFBsamps);
+	      snrmin = filgetmin(floatarchive,nFBsamps);
+	      cpgopen("/ps");
+	      setcolortable(0);
+	      cpgsvp(0.15,0.85,0.15,0.85);
+	      cpgswin(timeseriesindex[0],timeseriesindex[nFBsamps-1],filfch1,fchlast);
+	      cpgbox("BCNST",0.0,0,"BCNST",0.0,0);
+	      cpglab("Time (s)", "Frequency (MHz)", "");
+	      float tr[] = {timeseriesindex[0], 0.0, filtsamp, filfch1, filfoff*favg, 0.0};
+	      cpgimag(floatarchive,filnchans,nFBsamps,1,filnchans,1,nFBsamps,snrmin,snrmax,tr);
+	      cpgclos();
+	      cpgopen("/xs");
+	      setcolortable(colortable);
+	      cpgsvp(0.1,0.9,0.1,0.9);
+	      cpgswin(timeseriesindex[0],timeseriesindex[nFBsamps-1],filfch1,fchlast);
+	      cpgbox("BCNST",0.0,0,"BCNST",0.0,0);
+	      cpgimag(floatarchive,filnchans,nFBsamps,1,filnchans,1,nFBsamps,snrmin,snrmax,tr);
+
       }
       if (dumchar == 'a'){
 	favg*=2;

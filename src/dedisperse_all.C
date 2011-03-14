@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include "string.h"
 #include <libgen.h>
+#include <inttypes.h>
 #include "gtools.h"
 extern "C" {
 #include "dedisperse_all.h"
@@ -28,6 +29,7 @@ void inline_dedisperse_all_help(){
   fprintf(stderr,"-s Nsamps          Skip Nsamp samples before starting\n");
   fprintf(stderr,"-m Nsub            Create files with Nsub subbands\n");
   fprintf(stderr,"-l                 Create logfile of exact DMs used\n");
+  fprintf(stderr,"--zerodm           Use 'ZeroDM' RFI removal scheme.\n");
   fprintf(stderr,"-G                 Do giant burst search.\n");
   fprintf(stderr,"Gburst suboptions:\n");
   fprintf(stderr,"    -wid N [d: 30]  allow N bin tolerance between discrete bursts\n");
@@ -48,6 +50,12 @@ void inline_dedisperse_all_help(){
 #else
   fprintf(stderr,"**SINGLE THREADED MODE**\nLink against OpenMP (-fopenmp with GNU on gcc > 4.2 for multi-threaded)\n");
 #endif
+
+#if SIGNED
+  fprintf(stderr,"This version writes SIGNED 8-bit numbers\n");
+#else
+  fprintf(stderr,"This version writes UNSIGNED 8-bit numbers\n");
+#endif
 }
 
 FILE *input, *output, *outfileptr, *dmlogfileptr;
@@ -59,6 +67,12 @@ int ascii, asciipol, stream, swapout, headerless, nbands, userbins, usrdm, basel
 double refrf,userdm,fcorrect;
 float clipvalue,jyf1,jyf2;
 int fftshift;
+int verbose;
+bool randomise;
+bool zerodm=false;
+int max_chan_val=0;
+int output_rotate=0;
+int output_subtract=0;
 #include "wapp_header.h"
 #include "key.h"
 struct WAPP_HEADER *wapp;
@@ -142,7 +156,8 @@ void do_dedispersion(unsigned short int ** storage, unsigned short int * unpacke
     int idelay,start_chan,end_chan;
     LONG64BIT * casted_times;
     int chans_per_band = (int)(nchans/nbands);
-    
+    int chan; 
+    if(randomise)srand((unsigned int)(unpackeddata[ntodedisp/4]));
     for (int iband=0;iband<nbands;iband++){
 	casted_times = (LONG64BIT*) storage[iband];
 	start_chan = iband*chans_per_band;
@@ -151,7 +166,9 @@ void do_dedispersion(unsigned short int ** storage, unsigned short int * unpacke
 	for (int j=0;j<(ntodedisp)/4;j++)casted_times[j]=0;
 	for (int k=start_chan;k<end_chan;k++){
 	  if (killdata[k]==1){
-	    idelay = DM_shift(DMtrial,k-start_chan,tsamp,fch1_subband,foff);
+            chan=k-start_chan;
+	    if(randomise)chan=rand()%(end_chan-start_chan)+start_chan;
+	    idelay = DM_shift(DMtrial,chan,tsamp,fch1_subband,foff);
 	    int stride = k*ntoload+idelay;
 #pragma omp parallel for private(j)
 	    for (int j=0;j<ntodedisp/4;j++){
@@ -163,18 +180,50 @@ void do_dedispersion(unsigned short int ** storage, unsigned short int * unpacke
 }
 
 
+void do_zerodm(unsigned short int * zerodm, unsigned short int * unpackeddata, int ntodedisp, int ntoload,int * killdata){
+	int j=0;
+
+	if (verbose) printf("ZERODM %d %d\n",zerodm[0],zerodm[0]/nchans);
+
+	signed short int* zerodm_s = (signed short int*) zerodm;
+	signed short int* unpackeddata_s = (signed short int*) unpackeddata;
+	for (j=0;j<ntoload-1;j++){
+		zerodm_s[j] = zerodm_s[j]/nchans - max_chan_val;
+	}
+
+//	printf("%d %d\n",zerodm[0],unpackeddata[0]);
+	for (int k=0;k<nchans;k++){
+		if (killdata[k]==1){
+			int stride = k*ntoload;
+#pragma omp parallel for private(j)
+			for (j=0;j<ntoload-1;j++){
+				unpackeddata_s[j+stride] -= zerodm_s[j];
+				unpackeddata_s[j+stride] /=2;
+			}
+		} // killdata
+	} // channel #
+
+/*	for (int k=0;k<nchans;k++){
+		printf("%d %d\n",k,unpackeddata[k*ntoload]);
+	}*/
+	if (verbose) printf("Done ZERODM\n");
+}
+
+
 int main (int argc, char *argv[])
 {
   /* local variables */
 //  char string[180];
   int i,useroutput=0,nfiles=0,fileidx,sigproc,scan_number,subscan=0;
   int numsamps=0;
+  long long int totnumsamps=0;
   unsigned char * rawdata;
   unsigned short int * unpacked; //, * times;
   int nbytesraw;
   int ibyte,j,k;
   unsigned char abyte;
   unsigned short int ** times;
+  unsigned short int * dmzero;
   int nread;
   float DM_trial;
   int ndm=0;
@@ -183,7 +232,7 @@ int main (int argc, char *argv[])
   float total_MBytes = 0;
   float start_DM=0.0, end_DM;
   int counts;
-  int dmlogfile=0, verbose=0;
+  int dmlogfile=0;
   int readsamp = 0;
   int nreadsamp = 0;
   int skip = 0;
@@ -204,7 +253,9 @@ int main (int argc, char *argv[])
   int Gscrnch = 256;
   int Goffset = 0;
   float Girrel = 3;
-  char * Gfilename = "GResults.txt";
+  char *Gfilename;
+  Gfilename = (char *) malloc(13);
+  strcpy(Gfilename,"GResults.txt");
   float flo,fhi;
 
   if(sizeof(LONG64BIT) != 8 ){
@@ -235,6 +286,8 @@ int main (int argc, char *argv[])
   clipvalue=refrf=userdm=fcorrect=0.0;
   refdm=-1.0;
   output=NULL;
+  randomise=false;
+  zerodm=false;
   strcpy(ignfile,"");
 
   // **************************************
@@ -261,7 +314,16 @@ int main (int argc, char *argv[])
       /* Create a log file of the DMs */
       dmlogfile=1;
     }
-    else if (!strcmp(argv[i],"-i")) {
+    else if (!strcmp(argv[i],"--randomise")) {
+      /* randomise channels */
+      randomise=true;
+    }
+    else if (!strcmp(argv[i],"--zerodm")) {
+      /* randomise channels */
+      zerodm=true;
+    }
+
+   else if (!strcmp(argv[i],"-i")) {
       /* set intrinsic width */
       ti=atof(argv[++i]);
     }
@@ -297,8 +359,11 @@ int main (int argc, char *argv[])
       killing = 1;
       killfile = (char *) malloc(strlen(argv[++i])+1);
       strcpy(killfile,argv[i]);
-    }
-    else if (!strcmp(argv[i],"-G")) {
+    } else if (!strcmp(argv[i],"-or")) {
+	output_rotate=atoi(argv[++i]);
+    } else if (!strcmp(argv[i],"-os")) {
+	output_subtract=atoi(argv[++i]);
+    } else if (!strcmp(argv[i],"-G")) {
       doGsearch = 1;
       fprintf(stderr,"Will perform giant pulse search\n");
     }
@@ -315,7 +380,8 @@ int main (int argc, char *argv[])
       Girrel = atof(argv[++i]);
     }
     else if (!strcmp(argv[i],"-file")){
-      Gfilename = (argv[++i]);
+      Gfilename = (char *) malloc(strlen(argv[++i])+1);
+      strcpy(Gfilename,argv[i]);
     }
     else if (!strcmp(argv[i],"-mb")){
 	doMultibeam = 1;
@@ -399,6 +465,7 @@ int main (int argc, char *argv[])
   }
   
   numsamps = nsamples(inpfile,sigproc,nbits,nifs,nchans);	/* get numsamps */
+  totnumsamps = nsamples(inpfile,sigproc,nbits,nifs,nchans);
   if (usrdm) maxdelay = DM_shift(end_DM,nchans,tsamp,fch1,foff);
   cout << "maxdelay = " << maxdelay << endl;
   
@@ -437,6 +504,19 @@ int main (int argc, char *argv[])
     getDMtable(start_DM,end_DM, tsamp*1e6, ti, foff, (fch1+(nchans/2-0.5)*foff)/1000,nchans/nbands, tol, &ndm, DMtable);
   else
     getDMtable(0.0,end_DM, tsamp*1e6, ti, foff, (fch1+(nchans/2-0.5)*foff)/1000,nchans/nbands, tol, &ndm, DMtable);
+
+  // If Gsearch is being run but start_DM is non-zero, add 0.0 to DM table.
+  if (doGsearch && start_DM != 0.0){
+      float *tempDMtable = new float[ndm+1];
+      tempDMtable[0] = 0.0;
+#pragma omp parallel for private(i)
+      for (int i=0;i<ndm;i++){
+	  tempDMtable[i+1] = DMtable[i];
+      }
+      delete DMtable;
+      DMtable = tempDMtable;
+      ndm++;
+  }
   
   fprintf(stderr,"%d subbands from %d chans\n",nbands,nchans);
 
@@ -458,6 +538,10 @@ int main (int argc, char *argv[])
 	      (int)(nchans*ntoload*sizeof(unsigned short int)));
       exit(-2);
     }
+    if (zerodm){
+	    dmzero = (unsigned short int *) 
+		    malloc(sizeof(unsigned short int)*ntodedisp); 
+    }
     times = (unsigned short int **) 
       malloc(sizeof(unsigned short int*)*nbands); 
     for(int band=0; band < nbands; band++){
@@ -478,16 +562,56 @@ int main (int argc, char *argv[])
       for (int i=0;i<nchans;i++) killdata[i]=1; // ie don't kill anything.
     }
 
+
+
+  int prerotate=0;
+  if (zerodm){
+	  while(nchans*(pow(2,nbits)-1)*(float)(pow(2,prerotate)) < 32768)
+		  prerotate++;
+
+	  max_chan_val=(pow(2,nbits)-1)*(float)(pow(2,prerotate));
+
+	  printf("Using 'ZERODM' RFI reduction method\n");
+	  printf("Multiplying input by %d to increase dynamic range for zerodm removal\n",(int)(pow(2,prerotate)));
+  }
+
+
   int rotate = 0;
-  while(nchans*(pow(2,nbits)-1)/(float)nbands/(float)(pow(2,rotate)) > 255)
+  while(pow(2,prerotate)*nchans*(pow(2,nbits)-1)/(float)nbands/(float)(pow(2,rotate)) > 255)
     rotate++;
   
+  rotate-=output_rotate;
+
+  if (output_rotate){
+	  printf("Warning: Modifying scale factor by %d, some clipping may occur!\n",(int)(pow(2,output_rotate)));
+  }
   printf("Dividing output by %d to scale to 1 byte per sample per subband\n",(int)(pow(2,rotate)));
+
+  if(randomise){
+	  sprintf(outfile_root,"%s_RAND",outfile_root);
+	  printf("WARNING: Randomising channel order! Data will not be astrophysical.\n");
+  }
 
   // Set up gpulse control variables
   GPulseState Gholder(ndm); // Giant pulse state to hold trans-DM detections
   int Gndet;                // Integer number of detections in this beam
   int *Gresults;            // Integer array of results: contained as cand1.start.bin cand1.end.bin cand2.start.bin cand2.end.bin...... etc)
+  //Gresults = new int[totnumsamps*ndm]; // This declaration might not be necessary
+
+  if (doGsearch){
+      FILE *Gresultsfile;
+      Gresultsfile = fopen(Gfilename,"w");
+      if (Gresultsfile==NULL){
+	  fprintf(stderr,"Error opening giant search results output file %s.\nWILL NOT RUN GIANT SEARCH.\n\n",Gresultsfile);
+	  doGsearch = false;
+      } else {
+	  //HERE open Gfile and print out a short "header". Gfilename is the name of the file.
+	  // header needs to contain:        //      infilename, nsamp, tsamp, ctr. frequency, bandwidth, RA, DEC, UTC  time/date of obs, snr limit, Ndms, DM search range.
+	  fprintf(Gresultsfile,"# %s %lld %g %g %g %g %g %g %.3f %d %.2f %.2f\n",outfile_root,totnumsamps,tsamp,fch1 + 0.5*(nchans*foff),fabs(foff*nchans),(src_raj),(src_dej),(src_dej),Gthresh,ndm,start_DM,end_DM);
+      }
+      fclose(Gresultsfile);
+  }
+
 
   // Start of main loop
   for (int igulp=0; igulp<ngulps;igulp++){
@@ -518,6 +642,7 @@ int main (int argc, char *argv[])
   
     /* Unpack it if dedispersing */
     
+    
     if (1){
       if (verbose) fprintf(stderr,"Reordering data\n");
       // all time samples for a given freq channel in order in RAM
@@ -527,9 +652,10 @@ int main (int argc, char *argv[])
         for (j=0;j<ntoload;j++){
           abyte = rawdata[ibyte+j*nchans/sampperbyte];
 	  for (k=0;k<8;k+=nbits)
-            unpacked[j+((ibyte*8+k)/(int)nbits)*ntoload]=(unsigned short int)((abyte>>k)&andvalue);
+            unpacked[j+((ibyte*8+k)/(int)nbits)*ntoload]=(unsigned short int)((abyte>>k)&andvalue) << prerotate;
 	  }
       }
+      
       
       if (1==0){ // Old way.
       if (killing){
@@ -558,11 +684,18 @@ int main (int argc, char *argv[])
 	}
       }
       if (igulp==0) appendable=0; else appendable=1;
+
+
+      if (zerodm){
+	    do_dedispersion(&dmzero, unpacked, 1, ntoload, ntoload, 0, killdata);
+	    do_zerodm(dmzero, unpacked, ntodedisp, ntoload, killdata);
+      }
+
       for (int idm=0;idm<ndm;idm++)
 	{
 	  //DM_trial = get_DM(idm,nchans,tsamp,fch1,foff);
 	  DM_trial = DMtable[idm];
-	  if (DM_trial>=start_DM && DM_trial<=end_DM){
+	  if ((DM_trial>=start_DM && DM_trial<=end_DM) || (doGsearch && DM_trial==0)){
 	    if (verbose) fprintf(stderr,"DM trial #%d at  DM=%f ",idm,DM_trial);
 	    if (dmlogfile && igulp==0) fprintf(dmlogfileptr,"%f %07.2f\n",DM_trial,
 				   DM_trial);
@@ -570,9 +703,19 @@ int main (int argc, char *argv[])
 	    if(nbands==1)sprintf(outfile,"%s.%07.2f.tim",outfile_root,DM_trial);
 	    else sprintf(outfile,"%s.%07.2f.sub",outfile_root,DM_trial);
 	    // open it
-	    if (appendable) outfileptr=fopen(outfile,"a");
-	    if (!appendable){
+	    if (appendable){
+		outfileptr=fopen(outfile,"a");
+		if (outfileptr==NULL) {
+		    fprintf(stderr,"Error opening file %s\n",outfile);
+		    exit(-3);
+		}
+	    }
+	      if (!appendable){
 	      outfileptr=fopen(outfile,"w");
+	      if (outfileptr==NULL) {
+		  fprintf(stderr,"Error opening file %s\n",outfile);
+		  exit(-3);
+	      }
 	      // create a log of the 'sub' dms to dedisperse at
 	      // These DMs are chosen fairly arbitraraly, rather than
 	      // based on any ridgid mathematics.
@@ -608,13 +751,14 @@ int main (int argc, char *argv[])
 	    output=outfileptr;
 	    // write header variables into globals
 	    // dedisperse_header() uses "userdm" not refdm, so make sure to set that. MJK-19042010
-	    userdm = refdm = DM_trial;
+	    refdm = DM_trial;
+	    userdm = refdm;
 	    nobits = 8;
 	    // write header
 	    if (!appendable) dedisperse_header();
 	    // do the dedispersion
 	    do_dedispersion(times, unpacked, nbands, ntodedisp, ntoload, DM_trial, killdata);
-	    
+
 	    // Do the Gsearch for this DM trial
 	    if (doGsearch){
 		int runningmeanval = (int)(2.0/tsamp); //will smooth over two seconds.
@@ -630,18 +774,37 @@ int main (int argc, char *argv[])
 		    removebaseline(times[0],temptimes,ntodedisp,runningmeanval,3.0);
 		    Gholder.searchforgiants(idm,ntodedisp,(int)(Goffset*igulp),temptimes,Gthresh,Gwidtol,Gscrnch,DM_trial,1);
 		}
-		delete temptimes;
+		delete[] temptimes;
 	    }
 
 
 	    // write data
 	    if (1==1){
+#if SIGNED
+		char lotsofbytes[ntodedisp];
+#else
 		unsigned char lotsofbytes[ntodedisp];
+#endif
 		for (int d=0;d<ntodedisp;d++){
 		    for(int iband=0; iband<nbands; iband++){
 			unsigned short int twobytes = times[iband][d]>>rotate;
+			if (output_subtract){
+				twobytes-=output_subtract;
+				if (twobytes > 32768){
+					twobytes=0;
+				}
+			}
+			if (output_rotate && twobytes > 255){
+				twobytes=255;
+			}
 			//		unsigned char onebyte = twobytes;
+#if SIGNED
+			// here we subtract 128 to make signed since numbers were scaled
+			// to be between 0 -> 256
 			lotsofbytes[d]=(twobytes-128);
+#else
+			lotsofbytes[d]=(twobytes);
+#endif
 		    }
 		}
 		fwrite(lotsofbytes,ntodedisp,1,outfileptr);
@@ -659,23 +822,22 @@ int main (int argc, char *argv[])
     
     // After gulp's done, pump out the Gsearch results for that gulp
     if (doGsearch){
+
+	if (verbose) fprintf(stderr,"Completeing Gsearch results for this gulp\n");
 	string UTroot = outfile_root;
 	int pos = UTroot.find(".fil");
 	if( pos != string::npos)
 	    UTroot.replace(pos, 4, "");
+	
+	Gresults = Gholder.givetimes(&Gndet,tsamp,flo,fhi,Girrel,&UTroot[0],ibeam,Gfilename);
 
-	if (doMultibeam){
-	    fprintf(stderr,"Associating...\n");
-	    Gresults = Gholder.givetimes(&Gndet,tsamp,flo,fhi,Girrel,&UTroot[0],ibeam,Gfilename);
-	} else {
-	    Gresults = Gholder.givetimes(&Gndet,tsamp,flo,fhi,Girrel,&UTroot[0],-1,Gfilename);
-	}
 	Gholder.selfdestruct();
 //	for (i=0;i<ndm;i++) Gholder.DMtrials[i].erase(Gholder.DMtrials[i].begin(),Gholder.DMtrials[i].end());
 //      fprintf(stderr,"GRESULTS:\n");
 //      for (int i=0;i<Gndet;i+=2){
 //	  fprintf (stderr,"Detection %d: %d\t%d\n",i,Gresults[i],Gresults[i+1]);
 //      }
+	if (verbose) fprintf(stderr,"Completed Gsearch results for this gulp\n");
     }
 
   } //end per-gulp loop

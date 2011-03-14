@@ -189,6 +189,10 @@ main(int argc, char *argv[])
 				printf("%.5f\n",tsamp*1.0e6);
 			} else if (strings_equal(argv[i],"-nbits")) {
 				printf("%d\n",nbits);
+			} else if (strings_equal(argv[i],"-ibeam")) {
+				printf("%d\n",ibeam);
+			} else if (strings_equal(argv[i],"-nbeam")) {
+				printf("%d\n",nbeams);
 			} else if (strings_equal(argv[i],"-nifs")) {
 				printf("%d\n",nifs);
 			} else if (strings_equal(argv[i],"-src_raj")) {
@@ -294,6 +298,12 @@ main(int argc, char *argv[])
 			break;
 	}
 
+	if (isign > 0){
+		printf("Signedness of 8-bit numbers      : UNSIGNED (%d,%d)\n",isign,OSIGN);
+	}
+	if (isign < 0){
+		printf("Signedness of 8-bit numbers      : SIGNED (%d,%d)\n",isign,OSIGN);
+	}
 	printf("Time stamp of first sample (MJD) : %.12f\n",tstart);
 	printf("Gregorian date (YYYY/MM/DD)      : %4d/%02d/%02d\n",year,month,day);
 

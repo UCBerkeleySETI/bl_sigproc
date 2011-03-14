@@ -32,12 +32,11 @@ void buttonexplain();
 float * Creadspec(char * filename, int * npf, double * rate);
 void find_formspec(int n, float * d);
 void find_fft(int * n, float * d);
-void normalise(int n, float * d);
-void normalise(int n, float * d, float threshold);
-void mowlawn(int n, float * d, int *mown, int *nrejects, float threshold, int maxnscrunch); //ZAPPER
+void mowlawn(int n, float * d,float threshold, int maxnscrunch); //ZAPPER
 void getminmax(int n, float * d, float * min, float * max);
 void getminmaxes(int n, float * d, int nplot, float * ymin, float * ymax);
 void bscrunch(int npoints, float * d);
+void bscrunch(int * npoints, float * d);
 void plotminmax(int npoints, float * data, float tstart, float delta);
 void plotminmaxeff(int npoints, int nplot, float * data, float tstart, float delta);
 void min_means_min(float * min, float * max);
@@ -101,6 +100,7 @@ int main (int argc, char *argv[])
   char *killfile;
   bool dokill=false;
   bool ssigned=true;
+  bool fsigned=false;
   int topfold=-1;
   int topgiant=-1;
   int toppeak=-1; //?!? sarah added this 
@@ -123,6 +123,7 @@ int main (int argc, char *argv[])
     if (strings_equal(argv[i],"-s"))       sscanf(argv[++i],"%d",&nskipstart);
     if (strings_equal(argv[i],"-S"))       spectra=1;
     if (strings_equal(argv[i],"-i"))       ssigned=false;
+    if (strings_equal(argv[i],"-f"))      fsigned=true;
     if (strings_equal(argv[i],"-n"))       sscanf(argv[++i],"%d",&ngulp_original);
     if (strings_equal(argv[i],"-c"))       sscanf(argv[++i],"%f",&Gsigmacut);
     if (strings_equal(argv[i],"-z"))       zapswitch=1;
@@ -131,6 +132,7 @@ int main (int argc, char *argv[])
     if (nfiles>MAXFILES) error_message("too many open files");
     i++;
   }
+
 
   int ntimglobal_smallest=0, nsamp;
   for (i=0; i<nfiles; i++) {
@@ -146,6 +148,16 @@ int main (int argc, char *argv[])
     else
     {
     if ((headersize[i]=read_header(inputfile[i]))) {
+	    if (! fsigned){
+		    if (isign > 0) {
+			    ssigned=false;
+			    fprintf(stderr,"using signed header variable to set UNSIGNED\n");
+		    }
+		    if (isign < 0) {
+			    ssigned=true;
+			    fprintf(stderr,"using signed header variable to set SIGNED\n");
+		    }
+	    }
       if (i==0) dmoffirstfile = refdm;
       if (nbits!=8 && nbits!=32)
 	    error_message("giant currently only works for 8- or 32-bit data");
@@ -204,9 +216,8 @@ int main (int argc, char *argv[])
 	}
       }
       puti(ngulp);
-
-      find_baseline(time_series[i],ngulp,tsamp,2.0,3.0); //SARAHZAP
-      mowlawn(ngulp,time_series[i], mown, &nrejects,5,4);
+      find_baseline(ngulp,time_series[i],10.0/tsamp,5.0);
+      mowlawn(ngulp,time_series[i],5,256);
     }
     printf("%f\n",dummy);
     printf("Bad time samples found...\n");
@@ -272,9 +283,9 @@ int main (int argc, char *argv[])
   int nplot=ngulp_original;
   nstart=0;  //COMMENTED IN ZAPPER VERSION: MAY CAUSE CONFLICTS IN THIS VER.
   ngulp=ngulp_original;  //COMMENTED IN ZAPPER VERSION: MAY CAUSE CONFLICTS IN THIS VER.
-  float trialperiod;
+  double trialperiod;
   int doperiod=-1;
-  float xperiod;
+  double xperiod;
 
   bool zoneplot=false;
   int ngates=0;
@@ -295,7 +306,7 @@ int main (int argc, char *argv[])
 //    printf("manage x %f y %f plotno %d\n",x,y,plotno);
     if (button==BASELINE) {
 	for (i=0; i<nfiles; i++){
-	  find_baseline(time_series[i],ngulp,tsamp,2.0,3.0);
+	    find_baseline(ngulp,time_series[i],10.0/tsamp,5.0);
 	}
 	button = PLOT;
 	zoneplot=false;
@@ -395,7 +406,7 @@ int main (int argc, char *argv[])
     }
     if (button==NORMALISE) {
 	for (i=0; i<nfiles; i++){
-	  normalise(ngulp,time_series[i],3.0);
+	  normalise(ngulp,time_series[i],5.0);
 	}
 	button = PLOT;
 	Gsearched=false;
@@ -547,35 +558,49 @@ int main (int argc, char *argv[])
 	//plot the thing;
 	fprintf(stderr,"Please enter a period in seconds: ");
 	cin>>trialperiod;
-	xperiod = x;
+	xperiod = (double)x;
 	doperiod=plotno;
 	button=PLOT;
       }
-      if (ans==','){  // subtract 0.000001 seconds from period
+      if (ans=='m'){  // subtract 0.0000005 seconds from period
+	d->plotregions[plotno].reset();
+	trialperiod-=0.0000005;
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
+	doperiod=plotno;
+	button=PLOT;
+      }
+      if (ans=='/'){  // add 0.0000005 seconds to period
+	d->plotregions[plotno].reset();
+	trialperiod+=0.0000005;
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
+	doperiod=plotno;
+	button=PLOT;
+      }
+      if (ans==','){  // subtract 0.000005 seconds from period
 	d->plotregions[plotno].reset();
 	trialperiod-=0.000005;
-	fprintf(stderr,"Trial period is now %f\n",trialperiod);
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
 	doperiod=plotno;
 	button=PLOT;
       }
-      if (ans=='.'){  // add 0.000001 seconds to period
+      if (ans=='.'){  // add 0.000005 seconds to period
 	d->plotregions[plotno].reset();
 	trialperiod+=0.000005;
-	fprintf(stderr,"Trial period is now %f\n",trialperiod);
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
 	doperiod=plotno;
 	button=PLOT;
       }
       if (ans=='<'){  // subtract 0.001 seconds from period
 	d->plotregions[plotno].reset();
 	trialperiod-=0.001;
-	fprintf(stderr,"Trial period is now %f\n",trialperiod);
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
 	doperiod=plotno;
 	button=PLOT;
       }
       if (ans=='>'){  // add 0.001 seconds to period
 	d->plotregions[plotno].reset();
 	trialperiod+=0.001;
-	fprintf(stderr,"Trial period is now %f\n",trialperiod);
+	fprintf(stderr,"Trial period is now %lf\n",trialperiod);
 	doperiod=plotno;
 	button=PLOT;
       }
@@ -591,8 +616,8 @@ int main (int argc, char *argv[])
 	  min_means_min(&x,&xgate);
 	  printf("Period from %f to %f is %f\n",x,xgate,xgate-x);  
 	  doperiod=plotno;
-	  xperiod = x;
-	  trialperiod=xgate-x;
+	  xperiod = (double)x;
+	  trialperiod=(double)(xgate-x);
 	  ngates=0;
 	  button=PLOT;
 	}
@@ -668,7 +693,7 @@ int main (int argc, char *argv[])
  // ZAPPER SECTION
     if (button==MOWLAWN){
       for (i=0; i<nfiles; i++){
-	 mowlawn(ngulp,time_series[i], mown, &nrejects,5,4);
+	 mowlawn(ngulp,time_series[i],5,256);
       }
       printf("Lawn mown\n");
       fflush(stdout);
@@ -713,11 +738,11 @@ int main (int argc, char *argv[])
       if (doperiod>=0){
 	d->plotregions[doperiod].reset();
 	cpgsci(7);
-	for (float pstep=xperiod;pstep<10*nplot;pstep+=trialperiod){
+	for (double pstep=xperiod;pstep<10*nplot;pstep+=trialperiod){
 	  cpgmove(pstep,-1000);
 	  cpgdraw(pstep,1000);
 	}
-	for (float pstep=xperiod;pstep>0;pstep-=trialperiod){
+	for (double pstep=xperiod;pstep>0;pstep-=trialperiod){
 	  cpgmove(pstep,-1000);
 	  cpgdraw(pstep,1000);
 	}
@@ -766,247 +791,110 @@ int main (int argc, char *argv[])
 
 }
 
-void normalise(int n, float * d){
-
-  printf("Normalising %d samples\n",n);
-    double sum=0.0;
-    double sumsq=0.0;
-    int noff=0;
-    while (noff<n) {
-	sum+=d[noff];
-	sumsq+=d[noff]*d[noff];
-	noff++;
-      }
-    double mean=sum/(double)n;
-    double meansq=sumsq/(double)n;
-    double sigma=sqrt(meansq-mean*mean);
-    for (int i=0;i<n;i++) d[i]=(d[i]-mean)/sigma;
-    printf("mean, %f sigma! %f\n",mean,sigma);
-}
-
-void normalise(int n, float * d, float threshold){
-    printf("Normalising %d samples\n",n);
-    double sum=0.0;
-    double sumsq=0.0;
-    int noff=0;
-    while (noff<n) {
-	sum+=d[noff];
-	sumsq+=d[noff]*d[noff];
-	noff++;
-      }
-    double mean=sum/(double)n;
-    double meansq=sumsq/(double)n;
-    double sigma=sqrt(meansq-mean*mean);
-    for (int i=0;i<n;i++) d[i]=(d[i]-mean)/sigma;
-    printf("Mean, %f sigma! %f\n",mean,sigma);
-    // Now recompute sigma without threshold spikes
-    sum = 0.0;
-    sumsq=0.0;
-    int nsum=0;
-    noff=0;
-    while (noff<n) {
-      if (d[noff]<threshold){
-	sum+=d[noff];
-	sumsq+=d[noff]*d[noff];
-	nsum++;
-      }
-      noff++;
-    }
-    mean=sum/(double)noff;
-    meansq=sumsq/(double)noff;
-    sigma=sqrt(meansq-mean*mean);
-    for (int i=0;i<n;i++) d[i]=(d[i]-mean)/sigma;
-    printf("new mean, %f new sigma! %f\n",mean,sigma);
-}
-
-
-int quicksort_inplace_partition(int* array, int top, int bottom);
-void quicksort_inplace(int* array, int top, int bottom){
-	int middle;
-	if (top < bottom)
-	{
-		middle = quicksort_inplace_partition(array, top, bottom);
-		quicksort_inplace(array, top, middle);
-		quicksort_inplace(array, middle+1, bottom);
+/**
+ * timezap function creates a mask file (tchan.kill), with a bitmask for all RFI above threshold
+ * input: n = number of elements
+ * input: d = timeseries data
+ * input: threshold = max sigma of spikes.
+ * input: max_nscrunch = max amount of elements to average together. (default 256)
+ * output: modifies timeseries data (d) setting all masked spikes to 0.
+**/
+void mowlawn(int n, float * d, float threshold, int max_nscrunch){
+    printf("Mowing lawn: %d samples\n",n);
+    int i,j;
+    int nscrunch;
+    int cNum = n;
+    /* initiate and populate mask array */
+    int * mown = (int*)malloc(sizeof(int)*n);
+    for(i=0;i<n;mown[i]=1, ++i);
+    /* initiate and populate array used for manipulation */
+    float * ts = (float*)malloc(sizeof(float)*n);
+    for(i=0;i<n;ts[i]=d[i], ++i);
+    /* normalize data so amplitude == magnitude */
+    normalise(n,ts);
+    /* main loop for RFI cutting */
+    for(nscrunch=1;nscrunch<=max_nscrunch;nscrunch*=2) {
+	/* normalise data without spikes */
+	normalise(cNum,ts,threshold);
+	for(i=0;i<cNum;++i) {
+            if(fabs(ts[i])>threshold) {
+                for(j=0; j<nscrunch; ++j) { mown[((i)*nscrunch+j)]=0; }
+	    }
 	}
-	return;
+	bscrunch(&cNum,ts);
+    }
+    /* write the mask to the file tchan.kill */
+    FILE * tchanfile;
+    if ((tchanfile = fopen("tchan.kill","w"))==NULL) {
+	    printf("Error opening file\n");
+    } 
+    else {
+	fprintf(tchanfile,"#\n");
+        for(i=0; i<n; ++i) {
+	    fprintf(tchanfile, "%d\n", mown[i]);
+            d[i] = (mown[i]) ? d[i] : 0;
+        }
+    }
+    fclose(tchanfile);
 }
 
-
-int quicksort_inplace_partition(int* array, int top, int bottom){
-	int x = array[top];
-	int topidx = top - 1;
-	int botidx = bottom + 1;
-	int swap;
-	do
-	{
-		do
-		{
-			botidx --;
-		}while (x <array[botidx]);
-
-		do
-		{
-			topidx++;
-		} while (x >array[topidx]);
-
-		if (topidx < botidx)
-		{
-			swap = array[topidx];
-			array[topidx] = array[botidx];
-			array[botidx] = swap;
-		}
-	}while (topidx < botidx);
-	return botidx;
-}
-
-void mowlawn(int n, float * d, int * mown, int * nrejects, float threshold, int max_nscrunch){
-    printf("Mowing lawn %d samples\n",n);
-    double sum=0.0;
-    double sumsq=0.0;
-    int noff=0;
-
-    double meankeep;
-    double sigmakeep;
-
-    int nscrunch=1;
-    int current_n=n;
-    float origthreshold = threshold;
-
-    *nrejects=0;
-    while(nscrunch < max_nscrunch){
-
-     threshold = origthreshold*sqrt(nscrunch);
-
-     // Compute Mean and Sigma of timeseries
-     while (noff<current_n) {
-	 sum+=d[noff];
-	 sumsq+=d[noff]*d[noff];
-	 noff++;
-       }
-
-     double mean=sum/(double)current_n;
-     double meansq=sumsq/(double)current_n;
-     double sigma=sqrt(meansq-mean*mean);
-
-     // Normalise timeseries
-     for (int i=0;i<current_n;i++) d[i]=(d[i]-mean)/sigma;
-
-     if(nscrunch==1){
-       printf("Mean, %f sigma! %f\n",mean,sigma);
-       meankeep = mean;
-       sigmakeep = sigma;
-     }
-
-     // Now recompute sigma without spikes > threshold
-     sum = 0.0;
-     sumsq=0.0;
-     int nsum=0;
-     noff=0;
-     while (noff<current_n) {
-       if (d[noff]<threshold){
-	 sum+=d[noff];
-	 sumsq+=d[noff]*d[noff];
-	 nsum++;
-       }
-       noff++;
-     }
-
-     mean=sum/(double)nsum; //was previosly noff
-     meansq=sumsq/(double)nsum; // was previously noff
-     sigma=sqrt(meansq-mean*mean);
-     for (int i=0;i<current_n;i++) d[i]=(d[i]-mean)/sigma;
-     printf("new mean, %f new sigma, %f\n",mean,sigma);
-     noff =0;
-     int i=0;
-    
-     while (noff<current_n) {
-       if (fabs(d[noff]) > threshold){
-	 //printf("d[%d]=%f\n",noff,d[noff]);
-	 d[noff]= mean;
-	 for(int z = 0 ; z < nscrunch; z++){
-	   mown[*nrejects] = noff*nscrunch + z;
-	   *nrejects = *nrejects+1;
-	 }
-	 i++;
-       }
-
-       noff++;
-    /*   if ( *nrejects > (n/100)-1 ){
-	 printf("Too many rejects %d (out of %d) change threshold......\n",*nrejects,n/100-1);
-	 exit(-1);
-       }*/
-     }
-
-     bscrunch(current_n,d);
-     nscrunch*=2;
-     current_n /=2;
-    }
-
-    FILE *chantkill;
-    if ((chantkill = fopen("tchan.kill","w")) == NULL){
-      printf("Error opening file\n");
-      exit(-4);
-    }
-    fprintf(chantkill,"#%lf\t%lf\n",meankeep,sigmakeep);
-
-    
-    quicksort_inplace(mown,0,*nrejects);
-//    for (int i =0 ; i < *nrejects; i++){
-//	    printf("%d\n",mown[i]);
-  //  }
-    int currzap=0;
-    for (int i =0 ; i < n; i++){
-      // Skip on, writing 1s, until we reach the next thing that was mown
-      if(currzap >= *nrejects || i < mown[currzap]){
-	fprintf(chantkill,"1\n",i);
-      } else {
-	// When we reach something to mow, write a zero
-	fprintf(chantkill,"0\n",i);
-	currzap++;
-	// in case we mow the same sample more than once, we check that we have moved on
-	// to a larger sample to mow, otherwise we try the next entry in the mown array.
-	while(currzap < *nrejects && mown[currzap]<=i)currzap++;
-      }
-    }
-
-    fclose(chantkill);
-}
-
-
-
+/**
+ * fixed getminmax now has one loop
+**/
 void getminmax(int n, float * d, float * min, float * max){
   int i;
   *min=*max=d[0];
-  for (i=0;i<n;i++) if (*min>d[i])*min=d[i];
-  for (i=0;i<n;i++) if (*max<d[i])*max=d[i];
-}
-
-void getminmaxes(int n, float * d, int nplot, float * ymin, float * ymax){
-
-  // problems with int overflows in this routine for large n, nplot.
-  int i,j;
-  if (n<nplot){
-    for (i=0;i<n;i++) ymin[i]=ymax[i]=d[i];
+  for (i=0; i<n; ++i) {
+    if(*min>d[i]) *min=d[i];
+    if(*max<d[i]) *max=d[i];
   }
-  else
-    {
-     for (j=0;j<nplot;j++){
-       int index = (int) ((double)j*(double) n/double(nplot));
-       ymin[j]=ymax[j]=d[index];
-       for (i=index;i<index+n/nplot;i++){
-         if (ymin[j]>d[i])ymin[j]=d[i];
-         if (ymax[j]<d[i])ymax[j]=d[i];
-       }
-       }
-    }
 }
 
-/* scrunches by a factor 2 */
+/**
+ * fixed getminmaxes with no int overflow, if n<=nplot then the min and max arrays point to the d array.
+ * input: n, number of elements.
+ * input: d, data array.
+ * input: nplot, max number of points to plot.
+ * input: ymin, array of min values size of nplot.
+ * input: ymax, array of max values size of nplot.
+**/
+void getminmaxes(int n, float * d, int nplot, float * ymin, float * ymax){
+  long i,j,k,z;
+  float * dptr;
+  if(n<=nplot) {
+    ymin=ymax=d;
+  } else {
+    z = n/nplot;
+    for(i=0; i<nplot; ++i) {
+      k = i*z;
+      dptr = d+k;
+      if(k+z>=n) { z = n-(k+z); }
+      getminmax(z, d+k, ymin+i, ymax+i);
+    }
+  }
+}
 
+/* scrunches by a factor of 2 */
 void bscrunch(int npoints, float * d){
-  int i;
-  for (i=0;i<npoints/2;i++) d[i]=(d[2*i]+d[2*i+1])/2.0;
+    int i;
+    for (i=0; i<npoints/2; ++i) d[i]=(d[2*i]+d[2*i+1])/2.0;
+}
+
+/** 
+ * safely scrunches by a factor of 2,
+ * now includes overflow checking and min array size checking.
+ * input: npoints pointer
+ * input: (d) timeseries array
+ * output: modifies npoints to npoints/2 if successful
+ * output: modifies (d) to scrunched form (non-resized) if successful.
+**/
+void
+bscrunch(int * npoints, float * d) {
+    int i;
+    if(*npoints > 3) {
+	*npoints /= 2;
+	for (i=0; (2*i+2)<=(*npoints); ++i) d[i]=(d[2*i]+d[2*i+1])/2;
+    }
 }
 
 void plotminmax(int npoints, float * data, float tstart, float delta){
@@ -1020,16 +908,13 @@ void plotminmax(int npoints, float * data, float tstart, float delta){
   int xend = npoints;
   int npointsnow=npoints;
   int nplotnow=npoints;
-
-  //  printf("plotminmax entered\n");
-
+  
   x = (float*)malloc(sizeof(float)*nplotnow);
   if (x==NULL){
-    fprintf(stderr,"Error allocating %d bytes in plotminmax\n",
-	    sizeof(float)*nplotnow);
+    fprintf(stderr,"Error allocating %d bytes in plotminmax\n", sizeof(float)*nplotnow);
     exit(-1);
   }
-  //  printf("getminmax\n");
+
   getminmax(npoints, &data[xstart], &min, &max);
   diff = max-min;
   for (i=0;i<nplotnow;i++) x[i]=tstart + (float)(i) * delta;
@@ -1037,9 +922,7 @@ void plotminmax(int npoints, float * data, float tstart, float delta){
     xmx=xmn + delta * (float)nplotnow;
     ymn = min-diff*0.05;
     ymx = max+diff*0.05;
-//    printf("plotminmax xmin xmax ymin ymax %f %f %f %f\n",xmn,xmx,ymn,ymx);
     cpgswin(xmn,xmx,ymn,ymx);
-//    cpgsch(0.5);
     cpgbox("BCNST",0.0,0,"BCNST",0.0,0);
     cpgsci(1);
     cpgsch(1.0);
@@ -1048,8 +931,7 @@ void plotminmax(int npoints, float * data, float tstart, float delta){
 
 /* plots min and max for every npoints/nplot points */
 
-void plotminmaxeff(int npoints, int nplot, float * data, float tstart,
-		   float delta){
+void plotminmaxeff(int npoints, int nplot, float * data, float tstart, float delta) {
 
   //  fprintf(stderr,"plotminmaxeff\n");
   if (nplot>npoints) {
@@ -1102,7 +984,7 @@ void plotminmaxeff(int npoints, int nplot, float * data, float tstart,
 void formpdf(float * pdf, int pdfmax, int ngulp, float * time_series){
   //negative values are ignored
 
-    normalise(ngulp,time_series);
+    //normalise(ngulp,time_series);
     //zero pdf
     for (int i=0;i<pdfmax;i++)
       pdf[i]=0.0;
@@ -1419,6 +1301,7 @@ void helpmenu(){
     fprintf(stderr,"*              ----- GIANT -----            *\n");
     fprintf(stderr,"* An interface for the viewing and explora- *\n");
     fprintf(stderr,"*   tion of timeseries or filterbank data   *\n");
+    fprintf(stderr,"*        **** TEST VERSION  ******          *\n");
     fprintf(stderr,"* * * * * * * * * * * * * * * * * * * * * * *\n\n");
     fprintf(stderr,"Usage: giant filenames\n");
     fprintf(stderr,"\t(e.g.>>  giant *.tim)\n");
