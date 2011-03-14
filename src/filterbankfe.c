@@ -19,6 +19,7 @@ main (int argc, char *argv[])
   int   i,j,k,nfiles,fileidx,fileidx_start,inputdata,opened=0;
   char  message[80], chan_name[4];
   FILE  *mult_out[11][4];
+  FILE  *sum_output;
   int   mask[11][4];
   int   numsamps,summed=0;
   int   bpp_headersize = 32768;
@@ -43,23 +44,49 @@ main (int argc, char *argv[])
 
   /* ata transient pcap variables */
   char cblock[128], payload[100000];
-  unsigned int block[128], equalize_sum[128][11][4];
+  unsigned int block[128];
   float        equalize_coeff[128][11][4], average_power=0; 
+  double tacc[11], tdelta[11]; 
   float        temp_power=0.0;
   unsigned int bump, packet_len, packet_saved_len, ip, s;
   unsigned int oldaccumulation[11], accumulation_number[11];
-  int          equalize_init=0, first_packet=1;
+  int          equalize_init=0, first_packet=1, correcterror=0, statonly=0;
   int          ts_sec, ts_usec; /* packet timestamp seconds, microcseconds */
   long long    counter[11], prev_counter, last_counter[11];
+  double spectra_sum;
+  int delta;
+  int delta_counter[11];
+  double average=0.0;  
+  double start_times[11];
+  double end_times[11];
+  double start_cnt[11];
+  double end_cnt[11];
+  
+  double skip_acc[11];
+  double skip_count[11];
+  double skip_old_acc[11];
+  
+  int antenna_select = -1;
+  int ibob_select = -1;
+
+  for (i=0; i<11; i++) { start_times[i]=end_times[i]=start_cnt[i]=end_cnt[i]=-1; }
+  
   
   /* set and clear arrays */
   strcpy(chan_name,"DCBA"); /* A=3 B=2 C=1 D=0 */
   strcpy(file_prepend, "");
-  for (i=0; i<11; i++) { accumulation_number[i]=counter[i]=0; oldaccumulation[i]=-1; }
-  memset(block,        0, 128*     sizeof(unsigned int));
-  memset(equalize_sum, 0, 128*11*4*sizeof(unsigned int));
-  memset(mask,         0, 11*4*sizeof(int));
   
+  for (i=0; i<11; i++) { accumulation_number[i]=counter[i]=0; oldaccumulation[i]=-1; }
+
+  for (i=0; i<11; i++) delta_counter[i] = 0;
+  
+  memset(block,        0, 128*     sizeof(unsigned int));
+  memset(mask,         0, 11*4*sizeof(int));
+  memset(tacc,         0, 11 * sizeof(double));
+  memset(tdelta,         0, 11 * sizeof(double));
+  memset(skip_acc,         0, 11 * sizeof(double));
+  memset(skip_old_acc,         0, 11 * sizeof(double));
+  memset(skip_count,         0, 11 * sizeof(double));
   /* -- mask? -- */
   /* crab observation: */
   /*   2B         2D         4D         5A         5C         7B         7D         8A         8D         10C         10D  */  
@@ -87,6 +114,7 @@ main (int argc, char *argv[])
   wapp_isalfa=invert_band=clip_threshold=headeronly=0;
   time_offset=start_time=final_time=tstart=0.0;
   obits=-1;
+  tsamp=0.0;
   do_vanvleck=compute_spectra=1;
   strcpy(ifstream,"XXXX");
 
@@ -125,12 +153,21 @@ main (int argc, char *argv[])
         /* add a time offset in seconds to tstart */
         time_offset=atof(argv[++i]);
       } else if (strings_equal(argv[i],"-i")) {
+        /* flag IBOB to write */
+        i++;
+        if (atoi(argv[i])<0 || atoi(argv[i])>10) {
+          printf("IFstream must lie between 0 and 10\n");
+          return;
+        }
+        ibob_select = atoi(argv[i]);
+      } else if (strings_equal(argv[i],"-ant")) {
         /* flag IF stream to write */
         i++;
-        if (atoi(argv[i])<1 || atoi(argv[i])>4) {
-          error_message("IFstream must lie between 1 and 4");
+        if (atoi( argv[i])<0 || atoi(argv[i])>3) {
+          printf("antenna stream must lie between 0 and 3\n");
+          return;
         }
-        ifstream[atoi(argv[i])-1]='Y';
+        antenna_select = atoi(argv[i]);
       } else if (strings_equal(argv[i],"-swapout")) {
         /* perform byte swapping on all output data */
         swapout=1;
@@ -176,17 +213,24 @@ main (int argc, char *argv[])
       } else if (strings_equal(argv[i],"-mjd")) {
           /* get the fractional start mjd */
           tstart=atof(argv[++i]);
-      } else if (strings_equal(argv[i],"-eq")) {
-        /* equalize channels and ibobs */
-          equalize_all=1;
-      } else if (strings_equal(argv[i],"-sumall")) {
-        /* equalize channels and ibobs */
-          sumall=1;
       } else if (strings_equal(argv[i],"-skip2")) {
         /* skip spectra 2 for funny 1pps stuff */
         skip_packet_2=1; 
       } else if (strings_equal(argv[i],"-prepend")) {
         strcpy(file_prepend,argv[++i]);
+      } else if (strings_equal(argv[i],"-ra")) {
+        src_raj=atof(argv[++i]);
+      } else if (strings_equal(argv[i],"-dec")) {
+        src_dej=atof(argv[++i]);
+      } else if (strings_equal(argv[i],"-correct")) {
+        /* attempt to correct dropped packet errors for periodicity searches */
+        correcterror=1;
+      } else if (strings_equal(argv[i],"-tsamp")) {
+        /* set sampling time */
+        tsamp=atof(argv[++i]);
+      } else if (strings_equal(argv[i],"-statonly")) {
+        /* only produce statistics */
+        statonly = 1;
       } else {
         /* unknown argument passed down - stop! */
           filterbank_help();
@@ -225,7 +269,8 @@ main (int argc, char *argv[])
   fcentral=1430.0;
   fch1=fcentral  - ((nchans/2)+0.5)*foff;    // A bit of a guess
   nbits=8;
-  tsamp=1.0/(double)sample_rate;
+//  tsamp=1.0/(double)sample_rate;
+  if (tsamp == 0.0) tsamp = 0.000625;
   nifs=1;
 
 if (obits == 32) nbits = 32;
@@ -304,22 +349,21 @@ if (obits == 32) nbits = 32;
         /* add on a time offset in seconds to the start time */
         tstart+=time_offset/86400.0;
         /* broadcast the header */
-        if (sumall) {
-            /* to the single output file */
-            filterbank_header(output);
-        } else {
-            /* to the multiple output files */
-            for (i=0; i<11; i++) {
-                for (j=0; j<4; j++) {
-                    /* open them first */
-                    sprintf(outfile,"%sibob%02d%c.fil",file_prepend, i, chan_name[j]);
-//                  fprintf(stderr, "going to open %d %d: %s \n", i, j, outfile); fflush(stderr);
-                    mult_out[i][j]=fopen(outfile,"wb");
-                    /* write header */
-                    filterbank_header(mult_out[i][j]);
-                }
-            }
-        }
+          
+       /* to the multiple output files */
+		if(!statonly){
+			for (i=0; i<11; i++) {
+				for (j=0; j<4; j++) {
+					/* open them first */
+					sprintf(outfile,"%sibob%02d%c.fil",file_prepend, i, chan_name[j]);
+	//                  fprintf(stderr, "going to open %d %d: %s \n", i, j, outfile); fflush(stderr);
+					 mult_out[i][j]=fopen(outfile,"wb");
+					 /* write header */
+					 filterbank_header(mult_out[i][j]);
+				 }
+			 }
+		}
+
         if (headeronly) exit(0);
     }
     
@@ -351,7 +395,21 @@ if (obits == 32) nbits = 32;
 //      packet_len += (((unsigned int) payload[15])%256) * 16777216;
 
         if (!first_packet) {
-            bump = fread(&payload, sizeof(char), 16, input); /* skip 12 bits */
+            bump = fread(&payload, sizeof(char), 16, input); /* skip 16 bytes */
+         
+         
+            ts_sec = (((unsigned int) payload[0])%256);
+            ts_sec += (((unsigned int) payload[1])%256) * 256;
+            ts_sec += (((unsigned int) payload[2])%256) * 65536;
+            ts_sec += (((unsigned int) payload[3])%256) * 16777216;             
+   
+            ts_usec = (((unsigned int) payload[4])%256);
+            ts_usec += (((unsigned int) payload[5])%256) * 256;
+            ts_usec += (((unsigned int) payload[6])%256) * 65536;
+            ts_usec += (((unsigned int) payload[7])%256) * 16777216;
+   
+   
+   
             packet_len = (((unsigned int) payload[12])%256);
             packet_len += (((unsigned int) payload[13])%256) * 256;
 
@@ -365,6 +423,8 @@ if (obits == 32) nbits = 32;
             /* for first packet 8 bits of time stamp have been read farther up */
             
             bump = fread(&payload, sizeof(char), 8, input); /* skip 4 bits */
+
+
             packet_len = (((unsigned int) payload[4])%256);
             packet_len += (((unsigned int) payload[5])%256) * 256;
 
@@ -382,7 +442,10 @@ if (obits == 32) nbits = 32;
 
 //          fprintf(stderr, "bump = %d \n", bump); fflush(stderr);
             ip = (((unsigned int) payload[29])%256);
+            
 
+
+            
             /* accumulation number for this IP */
             if( ((int) (ip-38) >= 0) &&  ((int) (ip-38) < 12)) {
             
@@ -393,6 +456,13 @@ if (obits == 32) nbits = 32;
 
           //fprintf(stderr, "ip-38=%d acc_no=%d counter=%d packet_len=%d, packet_saved_len=%d\n", ip-38, 
           //        (int) accumulation_number[ip-38], (int) counter[ip-38], packet_len, packet_saved_len); fflush(stderr);
+
+
+  if(start_times[ip-38] == -1) start_times[ip-38]=(double) ts_sec + ((double) ts_usec/1000000.);
+  if(start_cnt[ip-38] == -1) start_cnt[ip-38] = (double) accumulation_number[ip-38];
+  
+  end_times[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+  end_cnt[ip-38] = (double) accumulation_number[ip-38];
 
  
             /* only start after the first counter reset */
@@ -417,6 +487,8 @@ if (obits == 32) nbits = 32;
             }
                     
             /* missing packets? */
+            
+            delta = accumulation_number[ip-38] - oldaccumulation[ip-38];
             if ( (accumulation_number[ip-38] - oldaccumulation[ip-38] != 1) &&
                  (accumulation_number[ip-38] - oldaccumulation[ip-38] != -1600) &&
                  (oldaccumulation[ip-38] != -1) ) {
@@ -426,14 +498,102 @@ if (obits == 32) nbits = 32;
                         ip-38, (int) counter[ip-38], (float) tsamp*counter[ip-38],
                         accumulation_number[ip-38], oldaccumulation[ip-38], 
                         (accumulation_number[ip-38] - oldaccumulation[ip-38]));
-                
-            
+						if( delta > 2500 ) printf("absurdly high delta: %d\n", delta);
+                        if ( delta > 0  && delta < 2500) {
+								if( (correcterror == 1) ) 
+								{
+									   fprintf(stderr, "Correcting...%d\n",  (accumulation_number[ip-38] - oldaccumulation[ip-38]) );
+									   
+									   //reset time counter
+									   tacc[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+									   
+									  for(k = 1;k < (accumulation_number[ip-38] - oldaccumulation[ip-38]);k++){ 
+											if(!statonly){		
+											   if (obits==32) {
+												for (j=0; j<4; j++) { /* for all channels in this iBOB */
+														if (! reversed) {
+															/* normal order */
+															for (i=64 ;i < 128;i++) {
+																temp_power = ((float) payload[(63+(i*4)+j)]) * equalize_coeff[i][ip-38][j];
+																fwrite(&temp_power,sizeof(float),1,mult_out[ip-38][j]);
+															}
+															for (i=0  ;i < 64 ;i++) {
+																temp_power = ((float) payload[(63+(i*4)+j)]) * equalize_coeff[i][ip-38][j];
+																fwrite(&temp_power,sizeof(float),1,mult_out[ip-38][j]); 
+															}
+														} else {
+															/* --------- output reversed band ---------------*/
+															for (i=63 ;i >= 0 ;i--) {
+																temp_power = ((float) payload[(63+(i*4)+j)]) * equalize_coeff[i][ip-38][j];
+																fwrite(&temp_power,sizeof(float),1,mult_out[ip-38][j]);
+															}
+															for (i=127;i >= 64;i--) {
+																temp_power = ((float) payload[(63+(i*4)+j)]) * equalize_coeff[i][ip-38][j];
+																fwrite(&temp_power,sizeof(float),1,mult_out[ip-38][j]);
+															}
+														}
+												}
+											
+											} else {
+								
+												for (j=0; j<4; j++) { /* for all channels in this iBOB */
+														if (! reversed) {
+															/* normal order */
+															for (i=64 ;i < 128;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+															for (i=0  ;i < 64 ;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+														} else {
+															/* --------- output reversed band ---------------*/
+															for (i=63 ;i >= 0 ;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+															for (i=127;i >= 64;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+														}
+												}
+								
+											}                
+									  	  }
+									  }
+								}            
+						
+    					}
+    	    } else {
+
+
+
+                    if( tacc[ip-38] == 0.0 ) {
+                       tacc[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+				    } else {
+				       //printf("%f %f\n", (double) ts_sec + ((double) ts_usec/1000000.), tacc[ip-38]);
+				       tdelta[ip-38] += ( ((double) ts_sec + ((double) ts_usec/1000000.)) - tacc[ip-38] );				    
+					    delta_counter[ip-38]++;
+				       tacc[ip-38] = (double) ts_sec + (((double) ts_usec)/1000000.);
+					}
+
+
+					if(skip_packet_2){
+						 if( (accumulation_number[ip-38] == 2) && (accumulation_number[ip-38] - oldaccumulation[ip-38] == 1) ){											 	
+							 /* first time through */
+							 if(skip_old_acc[ip-38] == 0.0) {
+								 skip_old_acc[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+							 } else {
+							 	 /* catch dropped 2nd packet */
+							 	 if (  (((double) ts_sec + ((double) ts_usec/1000000.)) - skip_old_acc[ip-38] )  < 1.2){
+									  skip_acc[ip-38] = skip_acc[ip-38] +  (((double) ts_sec + ((double) ts_usec/1000000.)) - skip_old_acc[ip-38] ) ;
+									  skip_old_acc[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+									  skip_count[ip-38] = skip_count[ip-38] + 1;	
+								 } else {
+								 	  skip_old_acc[ip-38] = (double) ts_sec + ((double) ts_usec/1000000.);
+								 }
+							 }
+						 }	
+					}
+
+
+
             }
             oldaccumulation[ip-38] = accumulation_number[ip-38];
 
             /* what's the order like? */
             if (check_order && (counter[ip-38] == prev_counter - 1)) { /* was: -1 */
-                fprintf(stderr, "Oops, ibob out of order: ibob=%d:   counter=%d, prev_counter=%d\n",
+                fprintf(stderr, "\nOops, ibob out of order: ibob=%d:   counter=%d, prev_counter=%d\n",
                         ip-38, (int) counter[ip-38], (int) prev_counter);
                 fprintf(stderr, "  Last counters:\n");
                 for (i=0;i<11;i++) {
@@ -452,112 +612,28 @@ if (obits == 32) nbits = 32;
                         (int) counter[ip-38], (float) tsamp*counter[ip-38]);
             }
 
+			/* normal order */
+			
+			/* investigate off-by-one */
+			
+			/*
+			if((ip-38 == 2) && (accumulation_number[ip-38]==0 || accumulation_number[ip-38]==1600 || accumulation_number[ip-38]==1599 || accumulation_number[ip-38]==1)){
+				spectra_sum=0;
+				for (i=0  ;i < 128 ;i++) {
+				   printf("%d ", (unsigned int) payload[(63+(i*4)+j)] );
+				   spectra_sum += (unsigned int) payload[(63+(i*4)+j)];
+
+				}
+				printf("\nibob: %i acc: %i sum: %f\n", ip-38, accumulation_number[ip-38], spectra_sum);
+			}
+			*/
+			
             /* skip packet number 2 until 1600/1601 packets per second problem is fixed */
             if (skip_packet_2 && accumulation_number[ip-38]==2) continue;
 
             /* -- what to do with packet? read for equalization, for summing or for writing -- */
             
-            /* are we still equalizing ? */
-            if (equalize_init) {
-                /* wrap up if we've added 128 spectra */
-                if (counter[ip-38]==128) {
-                    /* what's the average */
-                    for (i=0; i<128; i++) {
-                        for (j=0; j<4; j++) {
-                            for (k=0; k<11; k++) {
-                                average_power += (float) equalize_sum[i][k][j];
-                            }
-                        }
-                    }
-                  fprintf(stderr, "  average=%10.5f \n", average_power ); 
-                    average_power /= (128*128*11*4); /* samples * channels * ibobs * inputs */
-                  fprintf(stderr, "  average/128=%10.5f \n", average_power ); 
-                    /* calculate the coefficients */
-                  fprintf(stderr, "Done equalizing.\n"); 
-                  fprintf(stderr, "Done equalizing. Coefficients:\n\n"); 
-                  fprintf(stderr, "  average=%10.5f \n", average_power ); 
-                    for (i=0; i<128; i++) {
-                        for (j=0; j<4; j++) {
-                            for (k=0; k<11; k++) {
-                                /* scale divide by average power over the 128 spectra */
-                                equalize_coeff[i][k][j] = average_power*128/((float)equalize_sum[i][k][j]);
-                                if (equalize_sum[i][k][j]==0) equalize_coeff[i][k][j] = 1.0;
-                              fprintf(stderr, "(%d,%d,%d) /%d=%4.2f \n", i,k,j,equalize_sum[i][k][j], equalize_coeff[i][k][j]);
-                            }
-                        }
-                      fprintf(stderr, "\n");
-                    }
-                    equalize_init=0;
-                    
-                    
-                    fflush(stderr);
-//                  fprintf(stderr, "rewinding\n\n"); fflush(stderr);
-//                  rewind(input); /* not sure if you can do this on stdin */
-//                  
-//                  /* clear arrays again */
-//                  for (i=0; i<11; i++) { accumulation_number[i]=counter[i]=0; oldaccumulation[i]=-1; }
-//                  memset(block,          0, 128*     sizeof(unsigned int));
-
-                } else {
-                /* read and add for equalisation */
-//                  fprintf(stderr, "  \n ----- eq ip = %d:\n", ip-38);
-                    for (i=0; i<128; i++) {
-                        for (j=0; j<4; j++) { /* the 4 ibob inputs A=3 B=2 C=1 D=0 */
-//                          fprintf(stderr, "%d ", (unsigned int) payload[(63 + (i*4) + j)]);
-                            equalize_sum[i][ip-38][j] += (unsigned int) payload[(63 + (i*4) + j)];
-//                          fprintf(stderr, "  %10.4f\n", equalize_coeff[i][ip-38][j]);
-                        }
-//                      fprintf(stderr, "\n");
-                    }
-                }
-            /* Are we summing all ibobs and channels */
-            } else if (sumall) {
-        /* read and sum this band */
-                for (i=0; i<128; i++) {
-                    for (j=0; j<4; j++) { /* the 4 ibob inputs A=3 B=2 C=1 D=0 */
-                        if (! mask[ip-38][j]) {
-                             /* from 8-bit char to 32-bit unsigned int */
-                            block[i] += (unsigned int) payload[(63 + (i*4) + j)] * equalize_coeff[i][ip-38][j];
-//                          if (i==127) fprintf(stderr, "payload=%d, chan=%d equa=%f block=%d\n", 
-//                            (int) payload[(63 + (i*4) + j)], j,  equalize_coeff[i][ip-38][j], block[i]);
-                        }
-                    }
-                }
-                summed++;
-        //printf("summed: %d\n", summed);
-                /* summed all ibobs */
-                if (summed==11) {
-                    summed=0;
-                    /* scale down to 8 bits for writing */
-                    for (i=0; i<128; i++) {
-                        cblock[i]=(unsigned char)(block[i]/16); /* using 16 for 11 iBOBs @ 4 chans */
-                        block[i]=0;
-                    }
-                    /* -- write -- */
-                    /* ibob sends channels 64-127 first, then 0-63 */
-                    if (! reversed) {
-                        for (i=64 ;i < 128;i++) fwrite(&cblock[i],sizeof(char),1,output);
-                        for (i=0  ;i < 64 ;i++) fwrite(&cblock[i],sizeof(char),1,output);
-                    } else {
-                        /* --------- output reversed band ---------------*/
-//                      for (i=63 ;i >= 0 ;i--) fprintf(stderr, "%d=%u ", i,(unsigned int) cblock[i]);
-//                      for (i=127;i >= 64;i--) fprintf(stderr, "%d=%u ", i,(unsigned int) cblock[i]);
-//                      fprintf(stderr, "\n"); fflush(stderr);
-                        for (i=63 ;i >= 0 ;i--) fwrite(&cblock[i],sizeof(char),1,output);
-                        for (i=127;i >= 64;i--) fwrite(&cblock[i],sizeof(char),1,output);
-                    }
-                }
-
-
-//          fprintf(stderr, "int = %d %d\n", sizeof(unsigned int), sizeof(char));
-//          i=100; fprintf(stderr, "%d ", (int)payload[63+i*4]);
-//              fprintf(stderr, "ip-38=%d counter=%d ", ip-38, (int) counter[ip-38]); fflush(stderr);
-//          for (i=64; i<128; i++) cblock[i]=0; // HACK to remove half the band for testing.
-
-            /* write the data to individual output */
-            } else  { /* not summing */
-
-
+  
 
             if (obits==32) {
                 for (j=0; j<4; j++) { /* for all channels in this iBOB */
@@ -566,6 +642,7 @@ if (obits == 32) nbits = 32;
                       //for (i=63 ;i >= 0 ;i--) fprintf(stderr, "%d==%i ", i, (signed int) payload[(63+(i*4)+j)]);
                       //for (i=127;i >= 64;i--) fprintf(stderr, "%d==%u ", i, (unsigned int) payload[(63+(i*4)+j)]);
                       //fprintf(stderr, "\n"); fflush(stderr);
+					if(!statonly) {
                         if (! reversed) {
                             /* normal order */
                             for (i=64 ;i < 128;i++) {
@@ -589,30 +666,29 @@ if (obits == 32) nbits = 32;
                                 fwrite(&temp_power,sizeof(float),1,mult_out[ip-38][j]);
                             }
                         }
+                	}
                 }
             
             } else {
-
-                for (j=0; j<4; j++) { /* for all channels in this iBOB */
-                        /* ibob sends channels 64-127 first, then 0-63 */
-                      
-                      //for (i=63 ;i >= 0 ;i--) fprintf(stderr, "%d==%i ", i, (signed int) payload[(63+(i*4)+j)]);
-                      //for (i=127;i >= 64;i--) fprintf(stderr, "%d==%u ", i, (unsigned int) payload[(63+(i*4)+j)]);
-                      //fprintf(stderr, "\n"); fflush(stderr);
-                        if (! reversed) {
-                            /* normal order */
-                            for (i=64 ;i < 128;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
-                            for (i=0  ;i < 64 ;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
-                        } else {
-                            /* --------- output reversed band ---------------*/
-                            for (i=63 ;i >= 0 ;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
-                            for (i=127;i >= 64;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
-                        }
-                }
-
-        }
-
-
+				if(!statonly) {
+					  for (j=0; j<4; j++) { /* for all channels in this iBOB */
+							  /* ibob sends channels 64-127 first, then 0-63 */
+							
+							//for (i=63 ;i >= 0 ;i--) fprintf(stderr, "%d==%i ", i, (signed int) payload[(63+(i*4)+j)]);
+							//for (i=127;i >= 64;i--) fprintf(stderr, "%d==%u ", i, (unsigned int) payload[(63+(i*4)+j)]);
+							//fprintf(stderr, "\n"); fflush(stderr);
+							  if (! reversed) {
+								  /* normal order */
+								  for (i=64 ;i < 128;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+								  for (i=0  ;i < 64 ;i++) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+							  } else {
+								  /* --------- output reversed band ---------------*/
+								  for (i=63 ;i >= 0 ;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+								  for (i=127;i >= 64;i--) fwrite(&payload[(63+(i*4)+j)],sizeof(char),1,mult_out[ip-38][j]);
+							  }
+					  }
+				}
+	
             }
                                          
             }
@@ -621,7 +697,7 @@ if (obits == 32) nbits = 32;
             /* wrong packet length ??   */
             /* not sure about this code */
             if(bump != 0) {
-                if((packet_len == packet_saved_len) && (packet_len <= 1500)) {
+                if((packet_len == packet_saved_len) && (packet_len <= 1500) && (packet_len != 0)) {
                 //skip this packet using the usual maneuver
                      fprintf(stderr,"skipping packet with len=%d  saved_len=%d at ip=%d\n", packet_len, packet_saved_len, ip);
                      fflush(stderr);
@@ -657,12 +733,25 @@ if (obits == 32) nbits = 32;
   }
 
   /* all done, update log, close all files and exit normally */
-  for (i=0; i<11; i++) for (j=0; j<4; j++) close(mult_out[i][j]);
+  if(!statonly) { for (i=0; i<11; i++) for (j=0; j<4; j++) close(mult_out[i][j]); }
+  printf("\n");
+  for (i=0; i<11; i++){
+    printf("IBOB: %d - %10Lf pkts received in %6.12Lf sec. - avg acc time: %6.12Lf sec. - avg deltaT:  %6.12Lf sec. \n", i, (long double) (end_cnt[i]-start_cnt[i]), (long double) (end_times[i] - start_times[i]),  (long double) ((end_times[i] - start_times[i]) / (end_cnt[i]-start_cnt[i])), (long double) tdelta[i]/delta_counter[i]   );
+	average = average +  (tdelta[i]/delta_counter[i]);
+  }
+    
+  printf("\n\ntotal average: %6.12Lf sec on mjd: %f\n", (long double) (average/11.0), tstart);
+  
+  if(skip_packet_2) {
+	  	for (i=0; i<11; i++){
+  			printf("\n\naverage between 1pps: %6.12Lf sec on mjd: %f\n", (long double) (skip_acc[i]/skip_count[i]), tstart);
+  		}
+  }
 
+  
   update_log("finished");
   close_log();
   /*fclose(output);*/
-  exit(0);
   fprintf(stderr,"Completed Successfully\n");
-
+  exit(0);
 }
