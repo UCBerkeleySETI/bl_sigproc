@@ -117,6 +117,10 @@ main (int argc, char *argv[])
   tsamp=0.0;
   do_vanvleck=compute_spectra=1;
   strcpy(ifstream,"XXXX");
+  machine_id=11;    //-1
+  telescope_id=10;  //-1
+  data_type=1;
+  
 
   /* work out how many files are on the command line */
   i=1;
@@ -207,8 +211,7 @@ main (int argc, char *argv[])
         headerless=headerfile=1;
       } else if (strings_equal(argv[i],"-headeronly")) {
         /* only binary header written */
-        headeronly=1;
-    
+        headeronly=1;    
       /* ata filterbank options */
       } else if (strings_equal(argv[i],"-mjd")) {
           /* get the fractional start mjd */
@@ -222,6 +225,14 @@ main (int argc, char *argv[])
         src_raj=atof(argv[++i]);
       } else if (strings_equal(argv[i],"-dec")) {
         src_dej=atof(argv[++i]);
+      } else if (strings_equal(argv[i],"-az")) {
+        az_start=atof(argv[++i]);
+      } else if (strings_equal(argv[i],"-el")) {
+        za_start=atof(argv[++i]);       
+      } else if (strings_equal(argv[i],"-machine_id")) {
+        machine_id=atoi(argv[++i]);       
+      } else if (strings_equal(argv[i],"-telescope_id")) {
+        telescope_id=atoi(argv[++i]);       
       } else if (strings_equal(argv[i],"-correct")) {
         /* attempt to correct dropped packet errors for periodicity searches */
         correcterror=1;
@@ -261,9 +272,7 @@ main (int argc, char *argv[])
 
 
   /* hard code some values for now */
-  machine_id=11;    //-1
-  telescope_id=10;  //-1
-  data_type=1;
+
   nchans=128;
   foff=838.860800/4/nchans * -1.0;        // XXX hack
   fcentral=1430.0;

@@ -34,6 +34,9 @@ char tempo_site(int telescope_id) /*includefile*/
   case 10:
     return('s'); /*ATA*/
     break;
+  case 11:
+    return('t'); /*Leuschner*/
+    break;
   default:
     return('?'); /*unknown*/
     /*error_message("tempo_site: unknown telescope!");*/
@@ -77,6 +80,9 @@ char *telescope_name (int telescope_id) /*includefile*/
     break;
   case 10:
     strcpy(string,"ATA");
+    break;
+  case 11:
+    strcpy(string,"Leuschner");
     break;
   default: 
     strcpy(string,"???????"); 
@@ -128,6 +134,9 @@ char *backend_name (int machine_id) /*includefile*/
     break;
   case 12:
     strcpy(string,"MLMKURTOSIS");
+    break;
+  case 13:
+    strcpy(string,"LSPEC");
     break;
   default:
     strcpy(string,"?????");

@@ -6,11 +6,13 @@ void filterbank_header(FILE *outptr) /* includefile */
 {
   int i,j;
   output=outptr;
+  printf("in header\n");
   if (obits == -1) obits=nbits;
   /* go no further here if not interested in header parameters */
   if (headerless) return;
   /* broadcast the header parameters to the output stream */
-  if (machine_id != 0) {
+    printf("still in header\n");
+    if (machine_id != 0) {
     send_string("HEADER_START");
     send_string("rawdatafile");
     send_string(inpfile);
@@ -18,6 +20,7 @@ void filterbank_header(FILE *outptr) /* includefile */
       send_string("source_name");
       send_string(source_name);
     }
+    printf("sending machine_id..\n");
     send_int("machine_id",machine_id);
     send_int("telescope_id",telescope_id);
     send_coords(src_raj,src_dej,az_start,za_start);
