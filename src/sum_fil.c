@@ -502,7 +502,7 @@ main(int argc, char *argv[])
 		 gsl_histogram_get_range(spectra_quant, i + 1, &lower, &upper);		 
 		 quantmax = (float) upper;
 
-		  printf("top thresh bin %d val %f\n", quantmax);
+		  printf("top thresh bin %d val %f\n",i, quantmax);
 
 		  gsl_histogram_free (spectra_quant);
 		 

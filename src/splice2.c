@@ -2,9 +2,9 @@
 #include <config.h>
 #endif
 /*
-  SPLICE - splice several filterbank files starting on same time stamp together
+  SPLICE2 - splice several filterbank files starting on same time stamp together
   for use to analyse data from cloned machines sampling several parts of the 
-  band. e.g. multi-WAPPs. 
+  band. e.g. multi-WAPPs or multi Breakthrough Listen banks. 
   Initial version (Nov 2002) required contiguous bands. 
   New version     (Jun 2003) requires only high-lo frequency ordering
   Modified        (Jul 2005) to write out to file if -o file option is given
@@ -21,7 +21,9 @@ main (int argc, char **argv)
   int i=1, j, k, nfiles=0, *numbt, schans=0, nbytes, *nchan;
   FILE *input[32];
   char *block;
+  int headerbytes;
   double *stamp, *frch1, *froff, *frmhz;
+  double hackvalue = 0;
   output=stdout;
   /* print help if necessary */
   if (argc<=1 || help_required(argv[1])) {
@@ -38,6 +40,8 @@ main (int argc, char **argv)
       nfiles++;
     } else if (strings_equal(argv[i],"-o")) {
       output=open_file(argv[++i],"wb");
+    } else if (strings_equal(argv[i],"-h")) {
+      hackvalue = atof(argv[++i]);
     }
     i++;
   }
@@ -49,7 +53,9 @@ main (int argc, char **argv)
   numbt = (int *) malloc(nfiles*sizeof(int));
   nchan = (int *) malloc(nfiles*sizeof(int));
   for (i=0; i<nfiles; i++) {
-    if (read_header(input[i])) {
+    headerbytes = read_header(input[i]);
+    //fprintf(stderr, "read %d bytes from header of file %s\n",headerbytes, argv[i+1]); 
+    if (headerbytes > 0) {
       stamp[i]=tstart;
       frch1[i]=fch1;
       froff[i]=foff;
@@ -94,9 +100,9 @@ main (int argc, char **argv)
  
 
   /* files are in descending frequency order, so just send ch1 and offset from file 0 */
-  send_double("fch1",frch1[0]);
+  send_double("fch1",frch1[0] + hackvalue);
   send_double("foff",froff[0]);
-  
+  send_int("nchans",nchans * nfiles);
 
   if (!strings_equal(source_name,"")) {
     send_string("source_name");
@@ -113,8 +119,8 @@ main (int argc, char **argv)
   block = (char *) malloc(nbytes);
   while (1) {
     for (i=0; i<nfiles; i++) {
+      headerbytes = fread(block,1,nbytes,input[i]);
       if (feof(input[i])) exit(0);
-      fread(block,nbytes,1,input[i]);
       fwrite(block,nbytes,1,output);
     }
   }
