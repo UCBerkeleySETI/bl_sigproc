@@ -18,10 +18,10 @@
 FILE *output;
 main (int argc, char **argv)
 {
-  int i=1, j, k, nfiles=0, *numbt, schans=0, nbytes, *nchan;
+  int i=1, j, k, nfiles=0, *numbt, schans=0, *nchan;
+  long int nbytes, headerbytes;
   FILE *input[32];
   char *block;
-  int headerbytes;
   double *stamp, *frch1, *froff, *frmhz;
   double hackvalue = 0;
   output=stdout;
@@ -72,7 +72,7 @@ main (int argc, char **argv)
     if (numbt[i] != numbt[0])
       error_message("number of bits per sample in input files not identical!");
     if (i>0) {
-      if (frch1[i] > frch1[i-1]) 
+      if (frch1[i] >= frch1[i-1]) 
 	error_message("input files not ordered in descending frequency!");
     }
 
@@ -115,7 +115,8 @@ main (int argc, char **argv)
   send_int("nifs",nifs);
   send_string("HEADER_END");
 
-  nbytes = nchans*nbits/8;
+  nbytes = (long int) nchans* (long int) nbits/8;
+  fprintf(stderr, "nbytes per spectra: %ld\n", nbytes);
   block = (char *) malloc(nbytes);
   while (1) {
     for (i=0; i<nfiles; i++) {

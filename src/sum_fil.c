@@ -40,8 +40,8 @@ main(int argc, char *argv[])
     double spectra_sum[4096];  //max channels 4096
     
     /* for floats */
-    float fbuffer[4096];  //max channels 4096
-    float fspectra_sum[4096]; 
+    float fbuffer[16384];  //max channels 4096
+    float fspectra_sum[16384]; 
     float scale_factor;
 	float max, min;  /* minimum and maximum values for the quantization region */
 	
