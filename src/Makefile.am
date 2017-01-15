@@ -1,4 +1,4 @@
-bin_PROGRAMS=seek header dedisperse extract fake flatten clip downsample fold profile flux header bandpass reader readchunk splitter snrdm decimate splice splice2 dice depolyco blanker barycentre tree polyco2period makePsrXml ffa grey chaninfo step postproc filedit chop_fil dedisperse_all shredder filterbank filterbankfe sum_fil
+bin_PROGRAMS=seek dedisperse extract fake flatten clip downsample fold profile flux header bandpass reader readchunk splitter snrdm decimate splice splice2 dice depolyco blanker barycentre tree polyco2period makePsrXml ffa grey chaninfo step postproc filedit chop_fil dedisperse_all shredder filterbank filterbankfe sum_fil headeredit
 bin_SCRIPTS=accn  ahunt  csearch  foldsignals  hunt makedummy  monitor  quicklook 
 EXTRA_DIST=accn.csh ahunt.csh csearch.csh differ.csh exporter.csh foldsignals.csh help.csh hunt.csh include.csh makedummy.csh mkmonitor.csh quicklook.csh subint2prf.csh 
 MOSTLYCLEANFILES=sigproc.h accn  ahunt  csearch  foldsignals  hunt makedummy  monitor  quicklook
