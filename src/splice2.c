@@ -13,15 +13,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "sigproc.h"
 #include "header.h"
 FILE *output;
 main (int argc, char **argv)
 {
-  int i=1, j, k, nfiles=0, *numbt, schans=0, *nchan;
+  int i=1, j, k, nfiles=0, *numbt, schans=0, *nchan, ngaps = 0;
   long int nbytes, headerbytes;
   FILE *input[32];
   char *block;
+  char *zeros;
   double *stamp, *frch1, *froff, *frmhz;
   double hackvalue = 0;
   output=stdout;
@@ -46,6 +48,8 @@ main (int argc, char **argv)
     i++;
   }
 
+
+  
   /* read in headers and check time stamps */
   stamp = (double *) malloc(nfiles*sizeof(double));
   frch1 = (double *) malloc(nfiles*sizeof(double));
@@ -72,8 +76,13 @@ main (int argc, char **argv)
     if (numbt[i] != numbt[0])
       error_message("number of bits per sample in input files not identical!");
     if (i>0) {
-      if (frch1[i] >= frch1[i-1]) 
-	error_message("input files not ordered in descending frequency!");
+      if (frch1[i] >= frch1[i-1]) error_message("input files not ordered in descending frequency!");
+
+      if (frch1[i] != frch1[i-1] + nchan[i-1] * froff[i]) {
+      	printf("mismatch! current start: %f last ending freq: %f\n", frch1[i], frch1[i-1] + nchan[i-1] * froff[i-1]);
+      	printf("Will pad with zeros for %i banks...\n", ngaps = ngaps + (int)( ((frch1[i-1] + nchan[i-1] * froff[i-1]) - frch1[i]) / fabsf(froff[i-1] * nchan[i-1])) );
+		
+		}
     }
 
   }
@@ -102,7 +111,7 @@ main (int argc, char **argv)
   /* files are in descending frequency order, so just send ch1 and offset from file 0 */
   send_double("fch1",frch1[0] + hackvalue);
   send_double("foff",froff[0]);
-  send_int("nchans",nchans * nfiles);
+  send_int("nchans",nchans * (nfiles + ngaps));
 
   if (!strings_equal(source_name,"")) {
     send_string("source_name");
@@ -118,10 +127,17 @@ main (int argc, char **argv)
   nbytes = (long int) nchans* (long int) nbits/8;
   fprintf(stderr, "nbytes per spectra: %ld\n", nbytes);
   block = (char *) malloc(nbytes);
+  zeros = (char *) malloc(nbytes);
+  memset(zeros, 0x0, nbytes);
+  
   while (1) {
     for (i=0; i<nfiles; i++) {
       headerbytes = fread(block,1,nbytes,input[i]);
       if (feof(input[i])) exit(0);
+        if (frch1[i] != frch1[i-1] + nchan[i-1] * froff[i]) {
+			k = (int)( ((frch1[i-1] + nchan[i-1] * froff[i-1]) - frch1[i]) / fabsf(froff[i-1] * nchan[i-1]));
+			for(j = 0;j<k;j++) fwrite(zeros,nbytes,1,output);
+		}
       fwrite(block,nbytes,1,output);
     }
   }
