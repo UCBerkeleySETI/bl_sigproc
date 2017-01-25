@@ -17,7 +17,7 @@ int nbins;
 main(int argc, char *argv[]) 
 {
 	FILE *fileptr;
-	char filename[80],*telescope,*backend,*datatype,message[80],unit[16];
+	char filename[256],*telescope,*backend,*datatype,message[80],unit[16];
 	int i,j,year,month,day,check,rah,ram,ded,dem;
 	double ras,des,frac,tobs;
 	char sra[6],sde[6],decsign;
@@ -269,8 +269,8 @@ main(int argc, char *argv[])
 				printf("Lowest frequency channel  (MHz)  : %f\n",
 						frequency_table[nchans-1]);
 			} else {
-				printf("Frequency of channel 1 (MHz)     : %f\n",fch1);
-				printf("Channel bandwidth      (MHz)     : %f\n",foff); 
+				printf("Frequency of channel 1 (MHz)     : %0.15f\n",fch1);
+				printf("Channel bandwidth      (MHz)     : %0.15f\n",foff); 
 				printf("Number of channels               : %d\n",nchans);
 				printf("Number of beams                  : %d\n",nbeams);
 				printf("Beam number                      : %d\n",ibeam); 
@@ -292,8 +292,8 @@ main(int argc, char *argv[])
 			break;
 		case 6:
 			printf("Reference DM (pc/cc)             : %f\n",refdm);
-			printf("Frequency of channel 1 (MHz)     : %f\n",fch1);
-			printf("Channel bandwidth      (MHz)     : %f\n",foff); 
+			printf("Frequency of channel 1 (MHz)     : %0.15f\n",fch1);
+			printf("Channel bandwidth      (MHz)     : %0.15f\n",foff); 
 			printf("Number of channels               : %d\n",nchans);
 			break;
 	}
