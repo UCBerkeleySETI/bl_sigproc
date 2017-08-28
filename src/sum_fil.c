@@ -11,7 +11,7 @@
 #include <math.h>
 #include "header.h"
 #include "filterbank.h"
-
+//#include "sigproc.h"
 #include <string.h>
 #include <gsl/gsl_histogram.h>
 
@@ -106,15 +106,7 @@ main(int argc, char *argv[])
   	    nfiles++;
         i++;
   }
-  if (!nfiles) {
-	  error_message("no input files supplied on command line!");
-	  exit(1);
-  }
 
-  if (nfiles > 50) {
-      error_message("too many input files supplied on command line (max 50)!");
-	  exit(1);
-  }
 
 
   for(i = 0; i<nfiles; i++) {
@@ -125,17 +117,22 @@ main(int argc, char *argv[])
   if (argc>nfiles) {
 	 i=nfiles+1;
 	 while (i<argc) {
-		if (strings_equal(argv[i],"-o")) {
+	 
+	 
+	       if (help_required(argv[i])) {
+			   sum_fil_help();
+			   exit(0);
+		   } else if (strings_equal(argv[i],"-o")) {
 		
-		  /* get and open file for output */
-		  strcpy(outfile,argv[++i]);
-		  if(file_exists(outfile)) {
-			  sprintf(message,"output file (%s) exists!",argv[i]);
-			  error_message(message);
-			  exit(1);
-		  }
-		  output=fopen(outfile,"wb");
-		  opened=1;
+			  /* get and open file for output */
+			  strcpy(outfile,argv[++i]);
+			  if(file_exists(outfile)) {
+				  sprintf(message,"output file (%s) exists!",argv[i]);
+				  error_message(message);
+				  exit(1);
+			  }
+			  output=fopen(outfile,"wb");
+			  opened=1;
 
 		  } else if (strings_equal(argv[i],"-obits")) {
 			 /* number of output bits */
@@ -164,7 +161,7 @@ main(int argc, char *argv[])
 
 		  } else {
 
-
+			sum_fil_help();
 			/* unknown argument passed down - stop! */
 			sprintf(message,"unknown argument (%s) passed to filterbank.",argv[i]);
 			error_message(message);
@@ -174,10 +171,22 @@ main(int argc, char *argv[])
 	  }
   }
 
+  if (!nfiles) {
+	  error_message("no input files supplied on command line!");
+	  exit(1);
+  }
+
+  if (nfiles > 50) {
+      error_message("too many input files supplied on command line (max 50)!");
+	  exit(1);
+  }
+  
   if (!opened) {
 	  error_message("must have an output file (-o <output>)!");
 	  exit(1);
   }
+
+
 
 
 	pulsarcentric=barycentric=0;
@@ -422,6 +431,9 @@ main(int argc, char *argv[])
 		  printf("header size lead file: %Ld\n", headersize); 
 		  nbits=8;
 		  obits=8;
+		  tsamp = tsamp * (double) tcollapse;
+		  foff = foff * (double) fcollapse;
+		  
 		  nchans = output_nchans;
 		  strcpy(ifstream,"YYYY");
 		  

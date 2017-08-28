@@ -309,3 +309,23 @@ void reader_help() /*includefile*/
   puts("-stream     - produce a stream of numbers with START/STOP boundaries");
   puts("");
 }
+void sum_fil_help() /*includefile*/
+{
+  puts("");
+  puts("sum_fil  - sum and requantize filterbank format data \n");
+  puts("usage: sum_fil {input filenames} -o {output file} -{options}\n");
+  puts("filename is the filterbank data file (def=stdin)\n");
+  puts("options:\n");
+  puts("-obits       b - output data at b bits per sample (def=input)");
+  puts("-qlen        q - use q output spectra to calculate requantization statistics (def=all)");
+  puts("-chanstart   c - start at channel c for statistic calculations (def=start)");
+  puts("-chanend     c - end at channel c for statistic calculations (def=end)");
+  puts("-tcollapse   t - collapse t spectra in output (def=1)");
+  puts("-fcollapse   f - collapse f frequency channels in output (def=1)");
+  puts("");
+  puts("WARNING: This program is in development - input=32 bits output=8 bits is the only mode likely to work");
+  puts("");
+}
+
+
+
