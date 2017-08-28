@@ -158,11 +158,11 @@ main(int argc, char *argv[])
 			} else if (strings_equal(argv[i],"-za_start")) {
 				printf("%f\n",za_start);
 			} else if (strings_equal(argv[i],"-fch1")) {
-				printf("%.3f\n",fch1);
+				printf("%f\n",fch1);
 			} else if (strings_equal(argv[i],"-bandwidth")) {
-				printf("%.3f\n",fabs(foff)*(double)nchans);
+				printf("%f\n",fabs(foff)*(double)nchans);
 			} else if (strings_equal(argv[i],"-fmid")) {
-				printf("%.3f\n",fch1+foff*nchans/2);
+				printf("%f\n",fch1+foff*nchans/2);
 			} else if (strings_equal(argv[i],"-foff")) {
 				printf("%f\n",foff);
 			} else if (strings_equal(argv[i],"-refdm")||strings_equal(argv[i],"-dm")) {

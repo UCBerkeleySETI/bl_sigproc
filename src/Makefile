@@ -36,8 +36,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
-bin_PROGRAMS = seek$(EXEEXT) header$(EXEEXT) dedisperse$(EXEEXT) \
-	extract$(EXEEXT) fake$(EXEEXT) flatten$(EXEEXT) clip$(EXEEXT) \
+bin_PROGRAMS = seek$(EXEEXT) dedisperse$(EXEEXT) extract$(EXEEXT) \
+	fake$(EXEEXT) flatten$(EXEEXT) clip$(EXEEXT) \
 	downsample$(EXEEXT) fold$(EXEEXT) profile$(EXEEXT) \
 	flux$(EXEEXT) header$(EXEEXT) bandpass$(EXEEXT) \
 	reader$(EXEEXT) readchunk$(EXEEXT) splitter$(EXEEXT) \
@@ -48,7 +48,8 @@ bin_PROGRAMS = seek$(EXEEXT) header$(EXEEXT) dedisperse$(EXEEXT) \
 	grey$(EXEEXT) chaninfo$(EXEEXT) step$(EXEEXT) \
 	postproc$(EXEEXT) filedit$(EXEEXT) chop_fil$(EXEEXT) \
 	dedisperse_all$(EXEEXT) shredder$(EXEEXT) filterbank$(EXEEXT) \
-	filterbankfe$(EXEEXT) sum_fil$(EXEEXT) $(am__EXEEXT_1)
+	filterbankfe$(EXEEXT) sum_fil$(EXEEXT) headeredit$(EXEEXT) \
+	$(am__EXEEXT_1)
 am__append_1 = -lcfitsio -lm 
 am__append_2 =  -DPSRFITS
 am__append_3 = spec tune giant pgplotter getpulse peak best quickplot plotpulses quickgplot extragplot
@@ -368,6 +369,10 @@ header_SOURCES = header.c
 header_OBJECTS = header.$(OBJEXT)
 header_LDADD = $(LDADD)
 header_DEPENDENCIES = libsigproc.a $(am__DEPENDENCIES_1)
+headeredit_SOURCES = headeredit.c
+headeredit_OBJECTS = headeredit.$(OBJEXT)
+headeredit_LDADD = $(LDADD)
+headeredit_DEPENDENCIES = libsigproc.a $(am__DEPENDENCIES_1)
 makePsrXml_SOURCES = makePsrXml.c
 makePsrXml_OBJECTS = makePsrXml.$(OBJEXT)
 makePsrXml_LDADD = $(LDADD)
@@ -572,8 +577,8 @@ SOURCES = $(libsigproc_a_SOURCES) bandpass.c barycentre.c \
 	depolyco.c dice.c downsample.c extract.c $(extragplot_SOURCES) \
 	fake.c $(ffa_SOURCES) $(filedit_SOURCES) $(filterbank_SOURCES) \
 	$(filterbankfe_SOURCES) flatten.c flux.c fold.c getpulse.c \
-	$(giant_SOURCES) $(grey_SOURCES) header.c makePsrXml.c \
-	$(peak_SOURCES) pgplotter.c $(plotpulses_SOURCES) \
+	$(giant_SOURCES) $(grey_SOURCES) header.c headeredit.c \
+	makePsrXml.c $(peak_SOURCES) pgplotter.c $(plotpulses_SOURCES) \
 	polyco2period.c $(postproc_SOURCES) profile.c \
 	$(quickgplot_SOURCES) $(quickplot_SOURCES) readchunk.c \
 	reader.c $(seek_SOURCES) $(shredder_SOURCES) snrdm.c \
@@ -587,7 +592,7 @@ DIST_SOURCES = $(libsigproc_a_SOURCES) bandpass.c barycentre.c \
 	$(filedit_SOURCES) $(am__filterbank_SOURCES_DIST) \
 	$(filterbankfe_SOURCES) flatten.c flux.c fold.c getpulse.c \
 	$(am__giant_SOURCES_DIST) $(grey_SOURCES) header.c \
-	makePsrXml.c $(am__peak_SOURCES_DIST) pgplotter.c \
+	headeredit.c makePsrXml.c $(am__peak_SOURCES_DIST) pgplotter.c \
 	$(am__plotpulses_SOURCES_DIST) polyco2period.c \
 	$(postproc_SOURCES) profile.c $(am__quickgplot_SOURCES_DIST) \
 	$(am__quickplot_SOURCES_DIST) readchunk.c reader.c \
@@ -597,12 +602,12 @@ DIST_SOURCES = $(libsigproc_a_SOURCES) bandpass.c barycentre.c \
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/siemion/sw/sigproc/config/missing --run aclocal-1.11
+ACLOCAL = ${SHELL} /home/obs/sw/bl_sigproc/config/missing --run aclocal-1.11
 AMTAR = $${TAR-tar}
 AR = ar
-AUTOCONF = ${SHELL} /home/siemion/sw/sigproc/config/missing --run autoconf
-AUTOHEADER = ${SHELL} /home/siemion/sw/sigproc/config/missing --run autoheader
-AUTOMAKE = ${SHELL} /home/siemion/sw/sigproc/config/missing --run automake-1.11
+AUTOCONF = ${SHELL} /home/obs/sw/bl_sigproc/config/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/obs/sw/bl_sigproc/config/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/obs/sw/bl_sigproc/config/missing --run automake-1.11
 AWK = mawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -646,7 +651,7 @@ LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/siemion/sw/sigproc/config/missing --run makeinfo
+MAKEINFO = ${SHELL} /home/obs/sw/bl_sigproc/config/missing --run makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -679,17 +684,17 @@ SOCKET_LIBS =
 STRIP = strip
 VERSION = 5.0.4
 XMKMF = 
-XML2_CONFIG = no
-XML_CPPFLAGS = 
-XML_LIBS = 
+XML2_CONFIG = /usr/bin/xml2-config
+XML_CPPFLAGS = -I/usr/include/libxml2
+XML_LIBS = -L/usr/lib/x86_64-linux-gnu -lxml2
 X_CFLAGS = 
 X_EXTRA_LIBS = 
 X_LIBS = 
 X_PRE_LIBS =  -lSM -lICE
-abs_builddir = /home/siemion/sw/sigproc/src
-abs_srcdir = /home/siemion/sw/sigproc/src
-abs_top_builddir = /home/siemion/sw/sigproc
-abs_top_srcdir = /home/siemion/sw/sigproc
+abs_builddir = /home/obs/sw/bl_sigproc/src
+abs_srcdir = /home/obs/sw/bl_sigproc/src
+abs_top_builddir = /home/obs/sw/bl_sigproc
+abs_top_srcdir = /home/obs/sw/bl_sigproc
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_CXX = g++
@@ -721,7 +726,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/siemion/sw/sigproc/config/install-sh
+install_sh = ${SHELL} /home/obs/sw/bl_sigproc/config/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -1033,6 +1038,9 @@ grey$(EXEEXT): $(grey_OBJECTS) $(grey_DEPENDENCIES) $(EXTRA_grey_DEPENDENCIES)
 header$(EXEEXT): $(header_OBJECTS) $(header_DEPENDENCIES) $(EXTRA_header_DEPENDENCIES) 
 	@rm -f header$(EXEEXT)
 	$(LINK) $(header_OBJECTS) $(header_LDADD) $(LIBS)
+headeredit$(EXEEXT): $(headeredit_OBJECTS) $(headeredit_DEPENDENCIES) $(EXTRA_headeredit_DEPENDENCIES) 
+	@rm -f headeredit$(EXEEXT)
+	$(LINK) $(headeredit_OBJECTS) $(headeredit_LDADD) $(LIBS)
 makePsrXml$(EXEEXT): $(makePsrXml_OBJECTS) $(makePsrXml_DEPENDENCIES) $(EXTRA_makePsrXml_DEPENDENCIES) 
 	@rm -f makePsrXml$(EXEEXT)
 	$(LINK) $(makePsrXml_OBJECTS) $(makePsrXml_LDADD) $(LIBS)
@@ -1200,6 +1208,7 @@ include ./$(DEPDIR)/gmrt2fb.Po
 include ./$(DEPDIR)/gtools.Po
 include ./$(DEPDIR)/head_parse.Po
 include ./$(DEPDIR)/header.Po
+include ./$(DEPDIR)/headeredit.Po
 include ./$(DEPDIR)/help.Po
 include ./$(DEPDIR)/ignored_channels.Po
 include ./$(DEPDIR)/indexx.Po

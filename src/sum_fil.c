@@ -40,8 +40,11 @@ main(int argc, char *argv[])
     double spectra_sum[4096];  //max channels 4096
     
     /* for floats */
-    float fbuffer[16384];  //max channels 4096
-    float fspectra_sum[16384]; 
+    float *fbuffer;  
+    float *fspectra_sum; 
+
+
+
     float scale_factor;
 	float max, min;  /* minimum and maximum values for the quantization region */
 	
@@ -50,6 +53,8 @@ main(int argc, char *argv[])
 	
 	double lower, upper;
 
+	int tcollapse = 1;
+	int fcollapse = 1;
 
 	int chanstart = 0; /* channel to start at for quantization level computation */
 	int chanend = 0;   /* channel to end at for quantization level computation */
@@ -60,7 +65,8 @@ main(int argc, char *argv[])
     double discard = 0.000003;
 
 	char filename[80],*telescope,*backend,*datatype,message[80],unit[16], outfile[120];
-	int i,j, k, year,month,day,check,rah,ram,ded,dem, nfiles, opened=0;
+	long int i, j, k, m, n;
+	int year,month,day,check,rah,ram,ded,dem, nfiles, opened=0;
 	double ras,des,frac,tobs;
 	char sra[6],sde[6],decsign;
 	int raw,uth,utm,uts;
@@ -71,6 +77,8 @@ main(int argc, char *argv[])
 
 	/* get these from first file on command line, apply to output file */
 	int output_nchans=0, output_nbits=0, output_nifs=0, input_nbits;
+	int input_nchans=0, input_nifs=0;
+	
 	long long output_datasize=0;
     long long output_headersize=0;
 
@@ -128,19 +136,33 @@ main(int argc, char *argv[])
 		  }
 		  output=fopen(outfile,"wb");
 		  opened=1;
-	    } else if (strings_equal(argv[i],"-obits")) {
-		   /* number of output bits */
-		   output_nbits=atoi(argv[++i]);
-	    } else if (strings_equal(argv[i],"-qlen")) {
-		   /* number of spectra to use for quantization */
-		   qlen=atoi(argv[++i]);
-	    } else if (strings_equal(argv[i],"-chanstart")) {
-		   /* number of spectra to use for quantization */
-		   chanstart=atoi(argv[++i]);
-	    } else if (strings_equal(argv[i],"-chanend")) {
-		   /* number of spectra to use for quantization */
-		   chanend=atoi(argv[++i]);
-		} else {
+
+		  } else if (strings_equal(argv[i],"-obits")) {
+			 /* number of output bits */
+			 output_nbits=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-qlen")) {
+			 /* number of spectra to use for quantization */
+			 qlen=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-chanstart")) {
+			 /* start channel */
+			 chanstart=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-chanend")) {
+			 /* end channel */
+			 chanend=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-tcollapse")) {
+			 /* end channel */
+			 tcollapse=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-fcollapse")) {
+			 /* end channel */
+			 fcollapse=atoi(argv[++i]);
+
+
+		  } else {
 
 
 			/* unknown argument passed down - stop! */
@@ -169,37 +191,43 @@ main(int argc, char *argv[])
 	    rewind(fileptr[i]);
 		datasize=sizeof_file(argv[i+1])-headersize;
 	    numsamps=nsamples(argv[i+1],headersize,nbits,nifs,nchans);
+
 		if(output_datasize == 0 || datasize < output_datasize) {
 			output_datasize = datasize;
+			input_datasize = datasize;
 		    output_headersize = headersize;
+
 			output_ptr = i;
+
 		}
 		if(output_nchans == 0) {
-		  output_nchans = nchans; 
+		  output_nchans = nchans/fcollapse; 
+		  input_nchans = nchans;
 		  input_nbits = nbits; 
-		  output_nifs = nifs;		
+		  output_nifs = nifs;
+		  input_nifs = nifs;		
 		}
         if(nchans != output_nchans || nbits != input_nbits || nifs != output_nifs) {
 			sprintf(message,"channel/if/bit mismatch, exiting...");
 			error_message(message);
-			exit(1);
+			//exit(1);
         }
         
-        printf("outbits: %d inputbits: %d file: %s headersize: %d nbits: %d nifs: %d nchans: %d\n", output_nbits, input_nbits, argv[i+1],headersize, nbits, nifs, nchans); 
+        printf("outbits: %d inputbits: %d file: %s headersize: %Ld nbits: %d nifs: %d nchans: %d\n", output_nbits, input_nbits, argv[i+1],headersize, nbits, nifs, nchans); 
   }
 
 
   if (output_nbits == 8 && input_nbits == 8) {
 		  
 		 
-		  printf("minimum data size is: %ld\n", output_datasize);
+		  printf("minimum data size is: %Ld\n", output_datasize);
 		  
-		  printf("will dump: %d\n", (output_datasize / (long long) (output_nifs * output_nchans)));
+		  printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
 		  
 		  headersize=read_header(fileptr[output_ptr]);
 		  rewind(fileptr[output_ptr]);
 		
-		  printf("header size lead file: %d\n", headersize); 
+		  printf("header size lead file: %Ld\n", headersize); 
 		  fread(buffer, sizeof(char), headersize, fileptr[output_ptr]);
 		  fwrite(buffer, sizeof(char), headersize, output);
 		  rewind(fileptr[output_ptr]);
@@ -258,14 +286,14 @@ main(int argc, char *argv[])
 
 	} else if (output_nbits == 32 && input_nbits == 32) {
 
-		   printf("minimum data size is: %ld\n", output_datasize);
+		   printf("minimum data size is: %Ld\n", output_datasize);
 		   
-		   printf("will dump: %d\n", (output_datasize / (long long) (output_nifs * output_nchans)));
+		   printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
 		   
 		   headersize=read_header(fileptr[output_ptr]);
 		   rewind(fileptr[output_ptr]);
 		 
-		   printf("header size lead file: %d\n", headersize); 
+		   printf("header size lead file: %Ld\n", headersize); 
 		   fread(buffer, sizeof(char), headersize, fileptr[output_ptr]);
 		   fwrite(buffer, sizeof(char), headersize, output);
 		   rewind(fileptr[output_ptr]);
@@ -307,18 +335,19 @@ main(int argc, char *argv[])
 
 		  //output_datasize = output_datasize; // cut data output down by a factor of 4;
 		  
-		  printf("minimum data size is: %ld\n", output_datasize);
+		  printf("minimum data size is: %Ld\n", output_datasize);
 		  
-		  printf("will dump: %d\n", (output_datasize / (long long) (output_nifs * output_nchans)));
+		  printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
 		  
 		  headersize=read_header(fileptr[output_ptr]);
 		  rewind(fileptr[output_ptr]);
 		
-		  printf("header size lead file: %d\n", headersize); 
+		  printf("header size lead file: %Ld\n", headersize); 
 		  nbits=32;
 		  obits=32;
 		  strcpy(ifstream,"YYYY");
 		  filterbank_header(output);
+
 		  fread(buffer, sizeof(char), headersize, fileptr[output_ptr]);
 		  //fwrite(buffer, sizeof(char), headersize, output);
 		  rewind(fileptr[output_ptr]);
@@ -378,29 +407,28 @@ main(int argc, char *argv[])
 		} else if (output_nbits == 8 && input_nbits == 32) {
 		/* for now, this is the only mode guaranteed to work!  AS 7/12 */
 
+
+
 		  printf("input 32, output 8\n");
-		  printf("minimum data size is: %ld\n", output_datasize);
+		  printf("minimum data size is: %Ld\n", output_datasize);
 		  
-		  printf("will dump: %d\n", (output_datasize / (long long) (output_nifs * output_nchans)));
+		  printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
 		  
-		   for(i = 0; i<nfiles; i++) {
-				headersize=read_header(fileptr[i]);	
-			}
+
+		  rewind(fileptr[output_ptr]);	
+		  headersize=read_header(fileptr[output_ptr]);
 		
 		  machine_id = 10;
-		  printf("header size lead file: %d\n", headersize); 
+		  printf("header size lead file: %Ld\n", headersize); 
 		  nbits=8;
 		  obits=8;
+		  nchans = output_nchans;
 		  strcpy(ifstream,"YYYY");
 		  
 		  //hanning=hamming=zerolagdump=swapout=sumifs=headerless=headerfile=0;
 		  //invert_band=clip_threshold=headeronly=0;
 		
 		  filterbank_header(output);
-
-		  fread(buffer, sizeof(char), headersize, fileptr[output_ptr]);
-		  //fwrite(buffer, sizeof(char), headersize, output);
-		  rewind(fileptr[output_ptr]);
 		
 		 /* bump past header for all input files */
 		   for(i = 0; i<nfiles; i++) {
@@ -416,26 +444,34 @@ main(int argc, char *argv[])
 		
 		
 		/* step 1: read through quantization region and identify min and max values */
-
 		  /* loop over all the spectra in the quantization region */
 		  /* NEED TO CHECK IF qlen > totlen */
 		  min = 0;
 		  max = 0;
 		  
-		  if (chanend == 0) chanend = nchans; // if chanend not specified, set equal to nchans
+		  if (chanend == 0) chanend = input_nchans; // if chanend not specified, set equal to nchans
 		  
-		  printf("output_nifs: %d output_nchans %d nfiles %d qlen %d\n", output_nifs, output_nchans, nfiles, qlen);
+		  fbuffer = (float *) malloc (input_nchans * sizeof(float));
+		  fspectra_sum = (float *) malloc (output_nchans * sizeof(float));
+
+		  
+		  printf("output_nifs: %d output_nchans %d nfiles %d qlen %Ld\n", output_nifs, output_nchans, nfiles, qlen);
 		  for (j = 0; j < qlen; j++){		  
 			 /* read n spectra (1 spectra x n files), sum */
 			  /* reset spectra_sum to zero */			
-			 for(i=0;i<nchans;i++) fspectra_sum[i] = 0.0;			
+	
+			 for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
 			
-			 for(i = 0; i<nfiles; i++) {
-				  fread(&fbuffer, sizeof(float), (output_nifs * output_nchans), fileptr[i]);
-				  for(k=chanstart; k<chanend; k++) fspectra_sum[k] = (fspectra_sum[k] + fbuffer[k]);
+			 for(i = 0; i < tcollapse; i++) {
+				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+				
+				   for(k = 0; k < input_nchans; k + fcollapse) {
+				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
+				   }
+
 			 }			
 
-			 for(k=chanstart; k<(chanend); k++) {		
+			 for(k=0; k < output_nchans; k++) {		
 				 //printf("%f\n", );
 				 if(fspectra_sum[k] > max) max = fspectra_sum[k];
 				 if((fspectra_sum[k] < min && fspectra_sum[k] > 0.0) || min == 0.0) min = fspectra_sum[k];				  	
@@ -445,7 +481,11 @@ main(int argc, char *argv[])
 
 		printf("min: %f max: %f\n", min, max);		
 
-
+	   
+		for(i = 0; i<nfiles; i++) {
+			 rewind(fileptr[i]);
+			 headersize=read_header(fileptr[i]);	
+		}
 		
 
 
@@ -458,14 +498,18 @@ main(int argc, char *argv[])
 		  for (j = 0; j < qlen; j++){		  
 			 /* read n spectra (1 spectra x n files), sum */
 			  /* reset spectra_sum to zero */			
-			 for(i=0;i<nchans;i++) fspectra_sum[i] = 0.0;			
+			 for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
 			
-			 for(i = 0; i<nfiles; i++) {
-				  fread(&fbuffer, sizeof(float), (output_nifs * output_nchans), fileptr[i]);
-				  for(k=chanstart; k < chanend; k++) fspectra_sum[k] = (fspectra_sum[k] + fbuffer[k]);
+			 for(i = 0; i < tcollapse; i++) {
+				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+				  
+				   for(k = 0; k < input_nchans; k + fcollapse) {   		
+				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
+				   }
+				   
 			 }			
 
-			 for(k=chanstart; k < chanend; k++) {		
+			 for(k=0; k < output_nchans; k++) {		
 				 if(fspectra_sum[k] > 0.0) {
 				 	gsl_histogram_increment(spectra_quant, fspectra_sum[k]);			 
 			 		nelements++;
@@ -490,7 +534,7 @@ main(int argc, char *argv[])
 		 quantmin = (float) lower;
 		 
 		 		 
-		  printf("bottom thresh bin %d val %f\n", i, quantmin);
+		  printf("bottom thresh bin %ld val %f\n", i, quantmin);
 
 		 i = (int) (ceil(max) - floor(min) - 1);
 		 powersum = 0.0;
@@ -502,7 +546,7 @@ main(int argc, char *argv[])
 		 gsl_histogram_get_range(spectra_quant, i + 1, &lower, &upper);		 
 		 quantmax = (float) upper;
 
-		  printf("top thresh bin %d val %f\n",i, quantmax);
+		  printf("top thresh bin %ld val %f\n",i, quantmax);
 
 		  gsl_histogram_free (spectra_quant);
 		 
@@ -518,18 +562,22 @@ main(int argc, char *argv[])
 		
 		/* outer loop, read through all spectra, quantize to 8 bits, write to file */
 		
-		  for (j = 0; j < ((output_datasize/4) / (long long) (output_nifs * output_nchans)); j++){
+		  for (j = 0; j < ((input_datasize/4) / (long long) (input_nifs * input_nchans)); j++){
 		  
 
 
-			 for(i=0;i<nchans;i++) fspectra_sum[i] = 0.0;			
+		 	for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
 			
-			 for(i = 0; i<nfiles; i++) {
-				  fread(&fbuffer, sizeof(float), (output_nifs * output_nchans), fileptr[i]);
-				  for(k=0; k < nchans; k++) fspectra_sum[k] = (fspectra_sum[k] + fbuffer[k]);
-			 }			
+			 for(i = 0; i < tcollapse; i++) {
+				   fread(&fbuffer, sizeof(float), (nifs * nchans), fileptr[0]);
+				  
+				   for(k = 0; k < nchans; k + fcollapse) {   		
+				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
+				   }
+				   
+			 }					
 			
-			 for(k=0; k < nchans; k++) {		
+			 for(k=0; k < output_nchans; k++) {		
 				  quantval = quantize(fspectra_sum[k], quantmin, quantmax);
 				  fwrite(&quantval, sizeof(char), 1, output);	 				 
 			 }
