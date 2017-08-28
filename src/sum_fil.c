@@ -94,8 +94,8 @@ main(int argc, char *argv[])
     /* Create histograms and set ranges   */
 	/* _full for all pulse detections     */
 	/* _clean for rfi rejected detections */
-	gsl_histogram *spectra_quant = gsl_histogram_alloc (11221);
-	gsl_histogram_set_ranges_uniform (spectra_quant, 0, 11220);
+	gsl_histogram *spectra_quant; //= gsl_histogram_alloc (11221);
+	//gsl_histogram_set_ranges_uniform (spectra_quant, 0, 11220);
 
     
   /* work out how many files are on the command line */
@@ -207,10 +207,10 @@ main(int argc, char *argv[])
 		  output_nifs = nifs;
 		  input_nifs = nifs;		
 		}
-        if(nchans != output_nchans || nbits != input_nbits || nifs != output_nifs) {
-			sprintf(message,"channel/if/bit mismatch, exiting...");
+        if(ceil(nchans/fcollapse) != nchans/fcollapse) {
+			sprintf(message,"nchan not evenly divisible by fcollapse factor!");
 			error_message(message);
-			//exit(1);
+			exit(1);
         }
         
         printf("outbits: %d inputbits: %d file: %s headersize: %Ld nbits: %d nifs: %d nchans: %d\n", output_nbits, input_nbits, argv[i+1],headersize, nbits, nifs, nchans); 
@@ -522,6 +522,10 @@ main(int argc, char *argv[])
 		  
 		 printf("got: %f %f in %f elements\n", gsl_histogram_sigma(spectra_quant), gsl_histogram_mean(spectra_quant), nelements);
 		
+		
+		
+		/* here we identify the bins corresponding to the inner fraction 1 - 2 x discard */
+		
 		 i=0;
 		 powersum = 0.0;
 		 while(powersum/nelements < discard) {
@@ -536,7 +540,7 @@ main(int argc, char *argv[])
 		 		 
 		  printf("bottom thresh bin %ld val %f\n", i, quantmin);
 
-		 i = (int) (ceil(max) - floor(min) - 1);
+		 i = (long int) (ceil(max) - floor(min) - 1);
 		 powersum = 0.0;
 		 while(powersum/nelements < discard) {
 		 	powersum = powersum +  gsl_histogram_get(spectra_quant, i);		 
@@ -563,13 +567,12 @@ main(int argc, char *argv[])
 		/* outer loop, read through all spectra, quantize to 8 bits, write to file */
 		
 		  for (j = 0; j < ((input_datasize/4) / (long long) (input_nifs * input_nchans)); j++){
-		  
 
 
 		 	for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
 			
 			 for(i = 0; i < tcollapse; i++) {
-				   fread(&fbuffer, sizeof(float), (nifs * nchans), fileptr[0]);
+				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
 				  
 				   for(k = 0; k < nchans; k + fcollapse) {   		
 				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
