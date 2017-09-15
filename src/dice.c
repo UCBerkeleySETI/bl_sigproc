@@ -15,32 +15,85 @@
 #include <math.h>
 #include "sigproc.h"
 #include "header.h"
-FILE *output;
+
 main (int argc, char **argv)
 {
-  int i=1, j, k, channum, *numbt, kchans=0, ns, nbytes, *keep, simple;
+  int i=1, j, k, channum, *numbt, kchans=0, ns, nbytes, *keep, simple, startchan, endchan;
   unsigned int bit;
   int force=1;
   double *frmhz;
+
+  int chanstart=0;
+  int chanend=0;
+
   FILE *input,*keepfile;
+  FILE *output;
+
   float *block;
   unsigned char *charblock;
   unsigned char *onebitblock;
   unsigned short *shortblock;
 
-  output=stdout;
-  /* print help if necessary */
-  if (argc!=3 || help_required(argv[1])) {
-    /*dice_help();*/
-    puts("");
-    puts("usage: dice filterbank_file keep_file");
-    puts("");
-    puts("keep file is the list of channels to keep in the output");
-    puts("");
-    exit(0);
-  } else {
-    print_version(argv[0],argv[1]);
-  }
+  char outfile[255];
+  char keepfilename[255];
+  
+   output=stdout;
+  
+
+	 while (i<argc) {
+	 
+	 
+	       if (help_required(argv[i])) {
+				dice_help();			
+			   exit(0);
+		  
+		   } else if (strings_equal(argv[i],"-o")) {
+
+			  /* get and open file for output */
+			  strcpy(outfile,argv[++i]);
+			  if(file_exists(outfile)) {
+				  fprintf(stderr,"output file (%s) exists!",argv[i]);
+				  exit(1);
+			  }
+			  output=fopen(outfile,"wb");
+
+		  } else if (strings_equal(argv[i],"-keepfile")) {
+			 /* start channel */
+			 strcpy(keepfilename,argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-chanstart")) {
+			 /* start channel */
+			 chanstart=atoi(argv[++i]);
+
+		  } else if (strings_equal(argv[i],"-chanend")) {
+			 /* end channel */
+			 chanend=atoi(argv[++i]);
+
+		  } else {
+
+			dice_help();			
+			/* unknown argument passed down - stop! */
+			fprintf(stderr,"unknown argument (%s) passed to filterbank.",argv[i]);
+			exit(1);
+		}
+		i++;
+	  }
+
+if(argc < 3) {
+
+			dice_help();			
+			/* unknown argument passed down - stop! */
+			fprintf(stderr,"Must specify input and output.\n");
+			exit(1);
+
+}
+
+if(output == NULL) {
+			dice_help();			
+			/* unknown argument passed down - stop! */
+			fprintf(stderr,"Output file doesn't exist.");
+			exit(1);
+}
 
   if (strings_equal(argv[1],"stdin")) {
 	input = stdin;
@@ -58,23 +111,33 @@ main (int argc, char **argv)
   if (data_type != 1) 
     error_message("input data are not in filterbank format!");
 
-  keep=(int *) malloc(nchans*sizeof(int));
+    keep=(int *) malloc(nchans*sizeof(int));
+	frmhz = (double *) malloc(sizeof(double)*nchans);
+	for (i=0;i<nchans;i++) keep[i]=0;
+
 
   /* open up file to give channel numbers to keep */
-  if (!file_exists(argv[2])) 
+  if (!file_exists(keepfilename)) {
     error_message("keep file does not exist...");
+	k = 0;
+	for(i=startchan;i<endchan;i++){
+	  keep[i]=1;
+	  frmhz[k++]=fch1+(channum-1)*foff;
+	  kchans = startchan - endchan;
+    }    
 
-  keepfile=open_file(argv[2],"r");
-  frmhz = (double *) malloc(sizeof(double)*nchans);
-  keep  = (int *) malloc(sizeof(int)*nchans);
-  for (i=0;i<nchans;i++) keep[i]=0;
-  k=0;
-  while (fscanf(keepfile,"%d\n",&channum)==1) {
-    keep[channum-1]=1;
-    frmhz[k++]=fch1+(channum-1)*foff;
-    kchans++;
+  } else {
+	keepfile=open_file(keepfilename,"r");
+
+	k=0;
+ 
+	while (fscanf(keepfile,"%d\n",&channum)==1) {
+	  keep[channum-1]=1;
+	  frmhz[k++]=fch1+(channum-1)*foff;
+	  kchans++;
+    }
+  
   }
-
   /* do a check to see whether fch1 and foff are sufficient to describe
      the diced channels */
   fch1=frmhz[0];
@@ -116,41 +179,41 @@ main (int argc, char **argv)
   send_string("HEADER_END");
 
   block = (float *) malloc(nchans*sizeof(float));
-  onebitblock = (unsigned char *) malloc(nchans/8); //* sizeof(unsigned char));
-  charblock = (unsigned char *) malloc(nchans*sizeof(unsigned char));
-  shortblock = (unsigned short *) malloc(nchans*sizeof(unsigned short));
+
+switch (nbits) {
+   case 1:
+	 onebitblock = (unsigned char *) malloc(nchans/8); //* sizeof(unsigned char));
+	 break;
+
+   case 8:
+	 charblock = (unsigned char *) malloc(nchans*sizeof(unsigned char));
+	 break;
+
+   case 16:
+	 shortblock = (unsigned short *) malloc(nchans*sizeof(unsigned short));
+	 break;
+
+}  
 
   while (read_block(input,nbits,block,nchans)==nchans) {
     k=0;
+    
     if (force) {
       for (i=0; i<nchans; i++) {
-	if (keep[i]) 
-	  block[k++]=block[i];
-	else
-	  block[k++]=0;
+		if (keep[i]) 
+		  block[k++]=block[i];
+		else
+		  block[k++]=0;
       }	
-    } else {
+    } else if (nbits != 32) {
       for (i=0; i<nchans; i++) if (keep[i]) block[k++]=block[i];
     }
+    
     switch (nbits) {
     case 1:
-//      for (i=0;i<k/8;i++){
-//        for(j=0;j<8;j++){
-//	  if (block[8*i+j]>0.5){
-//      	    bit = 1;
-//	    charblock[i] = charblock[i]|bit;
-//	  }
-//	  else{
-//	    bit = 0;
-//	    charblock[i] = charblock[i]|bit;
-//	  }
-//	  if (j<7)
- //          charblock[i] = charblock[i]<<1;
-//	}
-//    }
       for (i=0;i<k/8;i++){
         onebitblock[i]=0;
-	for(j=0;j<8;j++){
+		for(j=0;j<8;j++){
           if (block[8*i+j]>0){
             bit = 1<<j;
             onebitblock[i] = onebitblock[i]|bit;
@@ -167,9 +230,14 @@ main (int argc, char **argv)
       for (i=0;i<k;i++) shortblock[i]=block[i];
       fwrite(shortblock,2,k,output);
       break;
+    case 32:
+      fwrite(block+startchan,2,k,output);
+      break;
+
     default:
-    error_message("dice - currently only works with 8 or 16 bit data");
+    error_message("dice - currently only works with 1, 8, 16 or 32 bit data");
     }
   }
+
 
 }

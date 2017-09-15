@@ -327,5 +327,19 @@ void sum_fil_help() /*includefile*/
   puts("");
 }
 
+void dice_help() /*includefile*/
+{
+  puts("");
+  puts("dice  - extract channels from filterbank file  \n");
+  puts("usage: dice {input filename} -o {output file} -{options}\n");
+  puts("filename is the filterbank data file (def=stdin)\n");
+  puts("options:\n");
+  puts("-keepfile     <keep_file> specify a file containing channels to keep, one per line (def=none)");
+  puts("-chanstart    c - start at channel c (def=0)");
+  puts("-chanend      c - end at channel c (def=end)");
+  puts("");
+  puts("WARNING: This program is in development");
+  puts("");
+}
 
 
