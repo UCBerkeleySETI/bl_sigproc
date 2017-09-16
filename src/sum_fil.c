@@ -467,17 +467,16 @@ main(int argc, char *argv[])
 		  fspectra_sum = (float *) malloc (output_nchans * sizeof(float));
 
 		  
-		  printf("output_nifs: %d output_nchans %d nfiles %d qlen %Ld\n", output_nifs, output_nchans, nfiles, qlen);
+		  printf("inp_nifs: %d  output_nifs: %d output_nchans %d nfiles %d qlen %Ld input_nchans %d, output_nchans %d\n", input_nifs,output_nifs, output_nchans, nfiles, qlen, input_nchans, output_nchans);
 		  for (j = 0; j < qlen; j++){		  
 			 /* read n spectra (1 spectra x n files), sum */
 			  /* reset spectra_sum to zero */			
-	
-			 for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
-			
+		     memset(fspectra_sum, 0x0, output_nchans * sizeof(float));
+		
 			 for(i = 0; i < tcollapse; i++) {
-				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
-				
-				   for(k = 0; k < input_nchans; k + fcollapse) {
+				   fread(fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+			   
+				   for(k = 0; k < input_nchans; k = k + fcollapse) {
 				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
 				   }
 
@@ -510,12 +509,12 @@ main(int argc, char *argv[])
 		  for (j = 0; j < qlen; j++){		  
 			 /* read n spectra (1 spectra x n files), sum */
 			  /* reset spectra_sum to zero */			
-			 for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
+		     memset(fspectra_sum, 0x0, output_nchans * sizeof(float));
 			
 			 for(i = 0; i < tcollapse; i++) {
-				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+				   fread(fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
 				  
-				   for(k = 0; k < input_nchans; k + fcollapse) {   		
+				   for(k = 0; k < input_nchans; k = k + fcollapse) {   		
 				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
 				   }
 				   
@@ -581,12 +580,12 @@ main(int argc, char *argv[])
 		  for (j = 0; j < ((input_datasize/4) / (long long) (input_nifs * input_nchans)); j++){
 
 
-		 	for(i=0;i<output_nchans;i++) fspectra_sum[i] = 0.0;			
+		     memset(fspectra_sum, 0x0, output_nchans * sizeof(float));
 			
 			 for(i = 0; i < tcollapse; i++) {
-				   fread(&fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+				   fread(fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
 				  
-				   for(k = 0; k < nchans; k + fcollapse) {   		
+				   for(k = 0; k < nchans; k = k + fcollapse) {   		
 				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
 				   }
 				   
