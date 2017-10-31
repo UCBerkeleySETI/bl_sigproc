@@ -9,6 +9,9 @@
 	write them when force=1 (currently hardwired). The reason for this
 	is so that the data can be sub-banded later on. zapped channels are
 	written as zeros.
+  Modified (Oct 31, 2017)  Adding "fast" chanstart/chanend mode for Breakthrough Listen
+    data.
+    
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,13 +22,14 @@ FILE *output;
 
 main (int argc, char **argv)
 {
-  int i=1, j, k, channum, *numbt, kchans=0, ns, nbytes, *keep, simple, startchan, endchan;
+  int channum, *numbt, kchans=0, ns, nbytes, *keep, simple; 
+  int chanstart, chanend;
   unsigned int bit;
   int force=0;
   double *frmhz;
-
-  int chanstart=0;
-  int chanend=0;
+  long int i=1, j, k;
+  chanstart=0;
+  chanend=0;
 
   FILE *input,*keepfile;
   
@@ -41,12 +45,21 @@ main (int argc, char **argv)
    output=stdout;
   
   sprintf(keepfilename, "DUMMUFILE");
+
+    if (argc == 1 || help_required(argv[1])) {
+		dice_help();			
+		exit(0);
+	}   
+
   if (strings_equal(argv[1],"stdin")) {
 	input = stdin;
   } else {
         /* open up file */
-  	if (!file_exists(argv[1])) 
-    		error_message("input file does not exist...");
+ 
+  	if (!file_exists(argv[1])) {
+    		fprintf(stderr, "input file %s does not exist...\n", argv[1]);
+    		 exit(0);
+    }		
   	input=open_file(argv[1],"rb");
   }
 
@@ -75,10 +88,12 @@ main (int argc, char **argv)
 		  } else if (strings_equal(argv[i],"-chanstart")) {
 			 /* start channel */
 			 chanstart=atoi(argv[++i]);
+			 //if(chanend == 0) chanend = -1;
 
 		  } else if (strings_equal(argv[i],"-chanend")) {
 			 /* end channel */
 			 chanend=atoi(argv[++i]);
+			 //if(chanstart == 0) chanstart = -1;
 
 		  } else if (strings_equal(argv[i],"--force")) {
 			 force = 1;
@@ -118,6 +133,20 @@ if(output == NULL) {
   if (data_type != 1) 
     error_message("input data are not in filterbank format!\n");
 
+if (!file_exists(keepfilename)) {
+  if (chanstart < 0) 
+    error_message("chanstart can't be negative!\n");
+
+  if (chanstart > nchans || chanend > nchans) {
+    fprintf(stderr, "chanstart: %d  chanend: %d   nchans: %d\n",chanstart, chanend, nchans);   
+    error_message("try again!\n");
+ }
+
+  if (chanend == 0) { 
+    printf("defaulting to chanend = nchan = %d\n", nchans);
+  	chanend = nchans;
+  }  
+}
 	  
 
   /* open up file to give channel numbers to keep */
@@ -127,6 +156,7 @@ if(output == NULL) {
     frmhz = (double *) malloc(sizeof(double)*1);
  	
 	frmhz[0] = fch1+(chanstart)*foff;
+	fch1 = frmhz[0];
 	kchans = chanend - chanstart;
 	simple=1;
 
@@ -199,20 +229,24 @@ if(output == NULL) {
 
 
 if (!file_exists(keepfilename)) {
-  /* Process with startchan/endchan options */
+  /* Process with chanstart/chanend options */
 
-	if(nbits != 32 || nbits != 8) error_message("dice (startchan/endchan) - currently only works with 1, 8, 16 bit data");
-
-
-    charblock = (unsigned char *) malloc((endchan - startchan)*(nbits/8));
-    
-    
-	while (fseek(input, (nbits/8) * startchan, SEEK_CUR)) {
-
-		 fread(charblock, 1, (nbits/8) * (endchan - startchan), input); 
-		 fwrite(charblock, 1, (nbits/8) * (endchan - startchan), output);
-		 fseek(input, (nbits/8) * (nchans - endchan), SEEK_CUR);
-
+	if(nbits != 32 && nbits != 8) error_message("dice (chanstart/chanend) - currently only works with 1, 8, 16 bit data");
+	
+	printf("%d\n",(int) (chanend - chanstart)*(nbits/8));
+	
+    charblock = (unsigned char *) malloc((chanend - chanstart)*(nbits/8));
+    i=0;
+	while (1) {
+		 fseek(input, (nbits/8) * chanstart, SEEK_CUR);
+		 if(fread(charblock, 1, (nbits/8) * (chanend - chanstart), input) != 0) {
+		 	i++;
+		 } else {
+		 	break;
+		 }
+		 fwrite(charblock, 1, (nbits/8) * (chanend - chanstart), output);
+		 fseek(input, (nbits/8) * (nchans - chanend), SEEK_CUR);
+		 printf("%ld\n", ftell(input));
 	}
 
   
