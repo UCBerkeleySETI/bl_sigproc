@@ -76,7 +76,7 @@ main (int argc, char **argv)
     if (numbt[i] != numbt[0])
       error_message("number of bits per sample in input files not identical!");
     if (i>0) {
-      if (frch1[i] >= frch1[i-1]) error_message("input files not ordered in descending frequency!");
+      //if (frch1[i] >= frch1[i-1]) error_message("input files not ordered in descending frequency!");
 
       if (frch1[i] != frch1[i-1] + nchan[i-1] * froff[i]) {
       	printf("mismatch! current start: %f last ending freq: %f\n", frch1[i], frch1[i-1] + nchan[i-1] * froff[i-1]);
