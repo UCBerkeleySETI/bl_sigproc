@@ -295,49 +295,58 @@ main(int argc, char *argv[])
 
 	} else if (output_nbits == 32 && input_nbits == 32) {
 
-		   printf("minimum data size is: %Ld\n", output_datasize);
-		   
-		   printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
-		   
-		   headersize=read_header(fileptr[output_ptr]);
-		   rewind(fileptr[output_ptr]);
-		 
-		   printf("header size lead file: %Ld\n", headersize); 
-		   fread(buffer, sizeof(char), headersize, fileptr[output_ptr]);
-		   fwrite(buffer, sizeof(char), headersize, output);
-		   rewind(fileptr[output_ptr]);
-		 
-		 
-		 
-		  /* bump past header for all input files */
-			for(i = 0; i<nfiles; i++) {
-				 headersize=read_header(fileptr[i]);	
-			 }
-		   
-		 
-		 
-		  /* rewind and bump past header for all input files */
-			for(i = 0; i<nfiles; i++) {
-				 rewind( fileptr[i] );
-				 headersize=read_header(fileptr[i]);	
-			 }
-		 
-		 scale_factor = output_datasize / ((float) (output_nifs * output_nchans));
-		 
-		 /* outer loop, read through all spectra, quantize to 8 bits, write to file */
-		 
-		   for (j = 0; j < (output_datasize / (long long) (4 * output_nifs * output_nchans)); j++){
-		   
-			  /* read n spectra (1 spectra x n files), sum */
-			  for(i=0;i<128;i++) fspectra_sum[i] = 0.0;
-			  for(i = 0; i<nfiles; i++) {
-				  fread(&fbuffer, sizeof(float), (output_nifs * output_nchans), fileptr[i]); 		
-		 
-				  for(k=0; k<128; k++) fspectra_sum[k] = (fspectra_sum[k] + (fbuffer[k] / scale_factor) );
-			   }
-			   fwrite(&fspectra_sum, sizeof(float), (output_nifs * output_nchans), output); 		        
-		 
+	  printf("input 32, output 32\n");
+		  printf("minimum data size is: %Ld\n", output_datasize);
+		  
+		  printf("will dump: %Ld\n", (output_datasize / (long long) (output_nifs * output_nchans)));
+		  
+
+		  rewind(fileptr[output_ptr]);	
+		  headersize=read_header(fileptr[output_ptr]);
+		
+		  machine_id = 10;
+		  printf("header size lead file: %Ld\n", headersize); 
+		  nbits=32;
+		  obits=32;
+		  tsamp = tsamp * (double) tcollapse;
+		  foff = foff * (double) fcollapse;
+		  
+		  nchans = output_nchans;
+		  strcpy(ifstream,"YYYY");
+		  
+		  //hanning=hamming=zerolagdump=swapout=sumifs=headerless=headerfile=0;
+		  //invert_band=clip_threshold=headeronly=0;
+		
+		  filterbank_header(output);
+		
+		
+		 /* rewind and bump past header for all input files */
+		   for(i = 0; i<nfiles; i++) {
+				rewind( fileptr[i] );
+				headersize=read_header(fileptr[i]);	
 			}
+		
+		
+		/* outer loop, read through all spectra, quantize to 8 bits, write to file */
+		
+		  for (j = 0; j < ((input_datasize/4) / (long long) (input_nifs * input_nchans)); j++){
+
+
+		     memset(fspectra_sum, 0x0, output_nchans * sizeof(float));
+			
+			 for(i = 0; i < tcollapse; i++) {
+				   fread(fbuffer, sizeof(float), (input_nifs * input_nchans), fileptr[0]);
+				  
+				   for(k = 0; k < nchans; k = k + fcollapse) {   		
+				   		for (m = 0; m < fcollapse; m++) fspectra_sum[k/fcollapse] = (fspectra_sum[k/fcollapse] + fbuffer[k + m]);
+				   }
+				   
+			 }					
+			
+
+			fwrite(fspectra_sum, sizeof(float), output_nchans, output);	 				 
+			 			   		
+		   }
 
 		} else if (output_nbits == 32 && input_nbits == 8) {
 
