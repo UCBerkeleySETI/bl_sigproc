@@ -22,7 +22,7 @@ int open_files(char scrdsk[])
   strcat(dir1,"/best_tmp"); 
  
   outfile=(char *)malloc(200);
-  sprintf(outfile, dir1);
+  sprintf(outfile, "%s", dir1);
  
   /*
     Open output files for writing.
