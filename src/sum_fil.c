@@ -64,7 +64,7 @@ main(int argc, char *argv[])
 	double powersum = 0.0;
     double discard = 0.000003;
 
-	char filename[80],*telescope,*backend,*datatype,message[80],unit[16], outfile[120];
+	char *telescope,*backend,*datatype,message[4096],outfile[4096];
 	long int i, j, k, m, n;
 	int year,month,day,check,rah,ram,ded,dem, nfiles, opened=0;
 	double ras,des,frac,tobs;
