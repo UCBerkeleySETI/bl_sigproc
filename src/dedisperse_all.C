@@ -170,8 +170,9 @@ void do_dedispersion(unsigned short int ** storage, unsigned short int * unpacke
 	    if(randomise)chan=rand()%(end_chan-start_chan)+start_chan;
 	    idelay = DM_shift(DMtrial,chan,tsamp,fch1_subband,foff);
 	    int stride = k*ntoload+idelay;
+	    int j;
 #pragma omp parallel for private(j)
-	    for (int j=0;j<ntodedisp/4;j++){
+	    for (j=0;j<ntodedisp/4;j++){
 		casted_times[j]+=*((LONG64BIT*) (unpackeddata+(j*4+stride)));
 	    }
 	  } // killdata
@@ -509,8 +510,9 @@ int main (int argc, char *argv[])
   if (doGsearch && start_DM != 0.0){
       float *tempDMtable = new float[ndm+1];
       tempDMtable[0] = 0.0;
+      int i;
 #pragma omp parallel for private(i)
-      for (int i=0;i<ndm;i++){
+      for (i=0;i<ndm;i++){
 	  tempDMtable[i+1] = DMtable[i];
       }
       delete DMtable;
@@ -662,8 +664,9 @@ int main (int argc, char *argv[])
 	for (int i=0;i<nchans;i++){
 	  if (!killdata[i]){
 	    cout << i << " " ;
+	    int j;
 #pragma omp parallel for private(j)	  
-	    for (int j=0;j<ntoload;j++)
+	    for (j=0;j<ntoload;j++)
 	      unpacked[j+i*ntoload]=0;
 	  }
 	}

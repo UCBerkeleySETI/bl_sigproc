@@ -29,10 +29,10 @@ char tempo_site(int telescope_id) /*includefile*/
     return('g'); /*Effelsberg*/
     break;
   case 9:
-    return('a'); /*140ft*/
+    return('s'); /*ATA*/
     break;
   case 10:
-    return('s'); /*ATA*/
+    return('z'); /*SRT*/
     break;
   case 11:
     return('t'); /*Leuschner*/
@@ -76,10 +76,10 @@ char *telescope_name (int telescope_id) /*includefile*/
     strcpy(string,"Effelsberg");
     break;
   case 9: 
-    strcpy(string,"140ft");
+    strcpy(string,"ATA");
     break;
   case 10:
-    strcpy(string,"ATA");
+    strcpy(string,"SRT");
     break;
   case 11:
     strcpy(string,"Leuschner");
