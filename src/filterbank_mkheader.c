@@ -158,8 +158,10 @@ while (i<argc) {
     telescope_id=6;
   else if (strcasecmp(telescope,"EFFELSBERG")==0)
     telescope_id=8;
+  else if (strcasecmp(telescope,"ATA")==0)
+    telescope_id=9;
   else {
-    fprintf(stderr, "Supported telescopes are PARKES, ARECIBO, JODRELL, GBT, EFFELSBERG - setting id to -1\n");
+    fprintf(stderr, "Supported telescopes are ATA, PARKES, ARECIBO, JODRELL, GBT, EFFELSBERG - setting id to -1\n");
     telescope_id = -1;
    }		
 
