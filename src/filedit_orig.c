@@ -9,12 +9,11 @@
 #include <time.h>
 
 #include "header.h"
-#include "filterbank.h"
+
 int read_header(FILE *inputfile);
 
-void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart);
+void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart, double newfoff);
 void zap_em(FILE* file, int* tzaps[2], int ntzaps, int fzaps[1024], int nfzaps,float mean, float sigma,char zap_mode);
-void FLIP(FILE* file, FILE *outfile, double flipTime,double flipFreq);
 float get_random_value(float mean, float sigma);
 
 // Replace mode options
@@ -35,8 +34,7 @@ void print_usage(){
 	printf("--tstart,-T           : modify the start mjd.\n");
 	printf("--beam,-b {i}         : modify the beam number to {i}\n");
 	printf("--nbeams,-B {i}       : modify number of beams to {i}\n");
-	printf("--flipFreq,-F	      : Reverse order of frequency order (only 8-bit)\n");
-	printf("--flipTime,-N	      : Reverse order of time samples (only 8-bit)\n");
+	printf("--negBand,-N	      : Change bandwidth sign and top frequency for a negative DM search");
 	printf("\nOther options:\n");
 	printf("--time-zap,-t \"s e\" : 'zap' samples between 's' and 'e'\n");
 	printf("--replace-gaussian,-G : Replace zapped Gaussian random number generator\n");
@@ -57,8 +55,6 @@ int main (int argc, char** argv){
 	double newra;
 	double newdec;
 	double newfoff=0;
-	double flipTime=0;
-	double flipFreq=0;
 	double bandwidth;
 	double newtstart;
 	int newibeam=-1;
@@ -67,7 +63,6 @@ int main (int argc, char** argv){
 	char newname[1024];
 	int c;
 	FILE* file;
-	FILE* outfile;
 	char killfile[20];
 	int killswitch=0;
 	int arr_size = 1024;
@@ -129,12 +124,7 @@ int main (int argc, char** argv){
 	long_opt[long_opt_idx].flag = NULL;
 	long_opt[long_opt_idx++].val = 'B';
 
-	long_opt[long_opt_idx].name = "flipFreq";
-        long_opt[long_opt_idx].has_arg = no_argument;
-        long_opt[long_opt_idx].flag = NULL;
-        long_opt[long_opt_idx++].val = 'F';
-
-	long_opt[long_opt_idx].name = "flipTime";
+	long_opt[long_opt_idx].name = "negBand";
         long_opt[long_opt_idx].has_arg = no_argument;
         long_opt[long_opt_idx].flag = NULL;
         long_opt[long_opt_idx++].val = 'N';
@@ -209,12 +199,9 @@ int main (int argc, char** argv){
 					case 'B':
 						newnbeams=atof(optarg);
 						break;
-					case 'F':
-						flipFreq=1; //Flag to flip freq axis 
-						break;	
 					case 'N':
-						flipTime=1; // Flag to flip time axis
-						break;
+						newfoff=1; //Flag to change sign
+						break;	
 					case 'k':
 						sscanf(optarg, "%s",killfile);
 						killswitch = 1;
@@ -295,15 +282,15 @@ int main (int argc, char** argv){
 		exit(-5);
 	}
 
-	if ( newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000 )fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart);
+	if ( newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000 || newfoff == 1)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart,newfoff);
 
 	if(ntimezaps > 0 || nfreqzaps > 0)zap_em(file,timezaps,ntimezaps,fzaps,nfreqzaps,mean,sigma,zap_mode);
-	if(flipTime==1 || flipFreq==1) FLIP(file,outfile,flipTime,flipFreq); 	
+
 	return 0;
 }
 
 
-void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart){
+void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart,double newfoff){
 	int newlen;
 	int hdr_len;
 	char* hdr_arr;
@@ -396,7 +383,6 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new nbeams = '%d'\n",newnbeams);
 			*((int*)(ptr)) = newnbeams;
 		}
-		/*
 		memcpy(buf,ptr,4);
 		buf[4]='\0';
 		if(newfoff == 1 && strcmp(buf,"foff")==0){
@@ -419,7 +405,6 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new top frequency = '%lf'\n",a_double);	
 			*((double*)(ptr)) = a_double;
 		}
-		*/
 		ptr++;
 	}
 
@@ -529,6 +514,7 @@ void zap_em(FILE* file, int* tzaps[2], int ntzaps, int fzaps[1024], int nfzaps,f
 	// read the file header
 	read_header(file);
 
+
 	while (cur_tzap < ntzaps){
 		while (cur_sample < tz_start){
 			// need to fzap, but for now we seek over...
@@ -565,72 +551,6 @@ void zap_em(FILE* file, int* tzaps[2], int ntzaps, int fzaps[1024], int nfzaps,f
 			tz_end = tzaps[1][cur_tzap];
 		}
 	}
-}
-
-void FLIP(FILE *file, FILE *outfile,double flipTime,double flipFreq){
-	int sample_nbytes,chan_nbytes;
-	long i=0,j=0;
-	long totsamp;
-	long headsize;
-	double *header;
-	
-	fseek(file,0,SEEK_SET);
-        // read the file header
-        read_header(file);
-
-
-	outfile=fopen("outfile.fil","w");
-
-	headsize=ftell(file);	
-	header = malloc(headsize);	
-	printf("Header size %ld\n",headsize);
-		
-	if ((nchans*nbits)%8){
-                fprintf(stderr,"ERROR: bytes per sample is not an integer\n");
-                exit(1);
-        }
-	chan_nbytes=nbits/8;
- 	sample_nbytes = (nchans*nbits)/8;
-	
-	char sample[nchans];
-	char chan;	
-
-	//Go to end of file 
-	fseek(file,0,SEEK_END);	
-	totsamp=ftell(file)/sample_nbytes;
-	printf("Total samples %ld\n", totsamp);
-
-	//Rewind
-	fseek(file,0,SEEK_SET);
-	read_header(file);
-
-	// Set for BPSR for fake data	
-	machine_id=10;
-	// IFs has to be set
-	sumifs=1;
-	obits=-1;
-
-	filterbank_header(outfile);
-
-	printf("chan_nbytes %d nchans %d sample_nbytes %d\n",chan_nbytes,nchans,sample_nbytes);
-		
-	for(i=0;i<totsamp;i++){
-		if(flipTime==1) fseek(file,-(i+1)*sample_nbytes,SEEK_END);
-		fread(sample,chan_nbytes,nchans,file);
-		//printf("\33[2K%d\r",i);
-		printf("\rAmount Complete = %.0f%%", (float)i*100/totsamp);
-	        fflush(stdout);
-		for(j=0;j<nchans;j++){
-                	if(flipFreq==1) chan=sample[nchans-j];
-			else chan = sample[j];
-                        fwrite(&chan,chan_nbytes,1,output);
-                }	
-	}
-	
-	
-	fclose(outfile);
-	fclose(file);
-	return(0);	
 }
 
 float get_random_value(float mu, float sigma){

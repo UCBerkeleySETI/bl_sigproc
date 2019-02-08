@@ -42,7 +42,7 @@ main(int argc, char *argv[])
 	char sra[6],sde[6],decsign;
 	int raw,uth,utm,uts;
 	long long numsamps,datasize,headersize;
-
+	char sname[80];
 
 	if (argc>1) {
 		if (help_required(argv[1])) {
@@ -101,6 +101,9 @@ i=2;
 				src_dej=strtod(argv[++i], NULL);
 				if (move_to_keyword(fileptr, "src_dej")) fwrite(&src_dej,sizeof(double),1,fileptr);  
 
+			} else if (strings_equal(argv[i],"-source_name")) {
+				strcpy(sname,argv[++i]);
+				if (move_to_keyword(fileptr, "source_name")) fwrite(&sname,sizeof(char),14,fileptr); // Fixed for source_name=FindMe			 
 			} else {
 				sprintf(message,"unknown argument (%s) passed to header",argv[i]);
 				error_message(message);

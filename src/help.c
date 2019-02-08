@@ -146,8 +146,10 @@ void fake_help() /*includefile*/
   puts("fake - produce fake filterbank format data for testing downstream code\n");
   puts("usage: fake -{options}\n");
   puts("options:\n");
-  puts("-period   p - period of fake pulsar in ms (def=random)");
-  puts("-width    w - pulse width in percent (def=4)");
+  //  puts("-period   p - period of fake pulsar in ms (def=random)");
+  puts("-period   p - period of fake pulsar in seconds (def=random)");
+  //  puts("-width    w - pulse width in percent (def=4)");
+  puts("-width    w - pulse width in seconds (def=4 percent of period)");
   puts("-snrpeak  s - signal-to-noise ratio of single pulse (def=1.0)");
   puts("-dm       d - dispersion measure of fake pulsar (def=random)");
   puts("-nbits    b - number of bits per sample (def=4)");
