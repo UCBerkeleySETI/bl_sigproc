@@ -290,12 +290,12 @@ int main (int argc, char** argv){
 	}
 
 	//printf("%s\n",argv[optind]);
-	if ((file = fopen(argv[optind],"r+")) ==NULL){
+	if ((file = fopen(argv[optind],"r")) ==NULL){
 		printf("Failed to open file '%s'.\n",argv[optind]);
 		exit(-5);
 	}
 
-	if ( newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000 )fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart);
+	if ( newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart);
 
 	if(ntimezaps > 0 || nfreqzaps > 0)zap_em(file,timezaps,ntimezaps,fzaps,nfreqzaps,mean,sigma,zap_mode);
 	if(flipTime==1 || flipFreq==1) FLIP(file,outfile,flipTime,flipFreq); 	
@@ -315,11 +315,12 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 	int i;
 
 	printf("Fixing header\n");
-	newlen = strlen(newname);
 
 	fseek(file,0,SEEK_SET);
 	hdr_len=read_header(file);
 	fseek(file,0,SEEK_SET);
+
+	newlen = strlen(newname);
 
 	hdr_arr = (char*)malloc(hdr_len);
 
@@ -396,30 +397,6 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new nbeams = '%d'\n",newnbeams);
 			*((int*)(ptr)) = newnbeams;
 		}
-		/*
-		memcpy(buf,ptr,4);
-		buf[4]='\0';
-		if(newfoff == 1 && strcmp(buf,"foff")==0){
-			ptr+=4;
-			a_double = *((double*)(ptr));		
-			printf("old bandwidth = '%lf'\n",a_double);
-			a_double = a_double * (-1);
-			printf("new bandwidth = '%lf'\n",a_double);                        
-			*((double*)(ptr)) = a_double;	
-		}
-		memcpy(buf,ptr,4);
-		buf[4]='\0';		
-		if(newfoff == 1 && strcmp(buf,"fch1")==0){
-			//fseek(file,0,SEEK_SET);
-			//read_header(file);			
-			ptr+=4;
-			a_double = *((double*)(ptr));
-			printf("old top frequency = '%lf'\n",a_double);
-			a_double = a_double + (nchans*foff);
-			printf("new top frequency = '%lf'\n",a_double);	
-			*((double*)(ptr)) = a_double;
-		}
-		*/
 		ptr++;
 	}
 
@@ -573,7 +550,8 @@ void FLIP(FILE *file, FILE *outfile,double flipTime,double flipFreq){
 	long totsamp;
 	long headsize;
 	double *header;
-	
+	char newbuf[1024];
+		
 	fseek(file,0,SEEK_SET);
         // read the file header
         read_header(file);
@@ -609,6 +587,11 @@ void FLIP(FILE *file, FILE *outfile,double flipTime,double flipFreq){
 	// IFs has to be set
 	sumifs=1;
 	obits=-1;
+
+	if(flipTime==1) sprintf(newbuf,"nT_%s",source_name);
+        if(flipFreq==1) sprintf(newbuf,"nF_%s",source_name);
+	if(flipTime == 1 && flipFreq == 1) sprintf(newbuf,"nTnF_%s",source_name);
+        strcpy(source_name,newbuf);
 
 	filterbank_header(outfile);
 
