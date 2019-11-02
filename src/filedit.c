@@ -337,7 +337,7 @@ int main (int argc, char** argv){
 	}
 
 	//printf("%s\n",argv[optind]);
-	if ((file = fopen(argv[optind],"r")) ==NULL){
+	if ((file = fopen(argv[optind],"r+")) ==NULL){
 		printf("Failed to open file '%s'.\n",argv[optind]);
 		exit(-5);
 	}
@@ -402,15 +402,6 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 
 
 		}
-
-/*
-
-	newfch1=-5;
-    newfoff=-5;
-    
-    double newtsamp, double newfch1, double newfoff, int newnchans
-    
-*/
 
 		memcpy(buf,ptr,7);
 		buf[7]='\0';
