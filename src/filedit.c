@@ -12,7 +12,7 @@
 #include "filterbank.h"
 int read_header(FILE *inputfile);
 
-void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart);
+void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart, double newtsamp, double newfch1, double newfoff, int newnchans);
 void zap_em(FILE* file, int* tzaps[2], int ntzaps, int fzaps[1024], int nfzaps,float mean, float sigma,char zap_mode);
 void FLIP(FILE* file, FILE *outfile, double flipTime,double flipFreq);
 float get_random_value(float mean, float sigma);
@@ -31,8 +31,12 @@ void print_usage(){
 	printf("Header fix Options:\n");
 	printf("--ra,-r {ra}          : modify the ra to {ra}. in form hhmmss.xxx \n");
 	printf("--dec,-d {dec}        : modify the dec to {dec}. in form ddmmss.xxx \n");
-	printf("--src-name,-n         : modify the source name.\n");
-	printf("--tstart,-T           : modify the start mjd.\n");
+	printf("--src-name,-n {str}   : modify the source name to {name}.\n");
+	printf("--tstart,-T {d}       : modify the start mjd.\n");
+	printf("--tsamp,-s            : modify the sample time.\n"); \\NEEDTOADD DOUBLE
+	printf("--nchans,-c           : modify the number of channels.\n"); \\NEEDTOADD integer
+	printf("--fch1,-f             : modify the frequency of channel 1.\n"); \\NEEDTOADD DOUBLE 
+	printf("--foff,-w             : modify the spectral bin width.\n"); \\NEEDTOADD DOUBLE
 	printf("--beam,-b {i}         : modify the beam number to {i}\n");
 	printf("--nbeams,-B {i}       : modify number of beams to {i}\n");
 	printf("--flipFreq,-F	      : Reverse order of frequency order (only 8-bit)\n");
@@ -54,13 +58,16 @@ int main (int argc, char** argv){
 	int* timezaps[2];
 	int fzaps[1024];
 	int ntimezaps,nfreqzaps;
-	double newra;
-	double newdec;
+	double newra=0;
+	double newdec=0;
 	double newfoff=0;
+	double newtsamp=0;
+	double newfch1=0;
+	int newnchans=0;
 	double flipTime=0;
 	double flipFreq=0;
 	double bandwidth;
-	double newtstart;
+	double newtstart=0;
 	int newibeam=-1;
 	int newnbeams=-1;
 	float mean,sigma;
@@ -79,11 +86,17 @@ int main (int argc, char** argv){
 	mean=0;
 	sigma=1;
 
+	/* I don't like doing it this way, but we'll go with convention for now - AS 11/2019 */
+	
 	newra =900000001;
 	newdec=900000001;
 	newtstart=900000001;
-
-
+	
+	newtsamp=-5;
+	newfch1=-5;
+    newnchans=-5;
+    newfoff=-5;
+    
 	long_opt[long_opt_idx].name = "help";
 	long_opt[long_opt_idx].has_arg = no_argument;
 	long_opt[long_opt_idx].flag = NULL;
@@ -118,6 +131,26 @@ int main (int argc, char** argv){
 	long_opt[long_opt_idx].has_arg = required_argument;
 	long_opt[long_opt_idx].flag = NULL;
 	long_opt[long_opt_idx++].val = 'T';
+
+	long_opt[long_opt_idx].name = "tsamp";
+	long_opt[long_opt_idx].has_arg = required_argument;
+	long_opt[long_opt_idx].flag = NULL;
+	long_opt[long_opt_idx++].val = 's';
+	
+	long_opt[long_opt_idx].name = "nchans";
+	long_opt[long_opt_idx].has_arg = required_argument;
+	long_opt[long_opt_idx].flag = NULL;
+	long_opt[long_opt_idx++].val = 'c';
+	
+	long_opt[long_opt_idx].name = "fch1";
+	long_opt[long_opt_idx].has_arg = required_argument;
+	long_opt[long_opt_idx].flag = NULL;
+	long_opt[long_opt_idx++].val = 'f';
+
+	long_opt[long_opt_idx].name = "foff";
+	long_opt[long_opt_idx].has_arg = required_argument;
+	long_opt[long_opt_idx].flag = NULL;
+	long_opt[long_opt_idx++].val = 'w';
 
 	long_opt[long_opt_idx].name = "beam";
 	long_opt[long_opt_idx].has_arg = required_argument;
@@ -295,7 +328,7 @@ int main (int argc, char** argv){
 		exit(-5);
 	}
 
-	if ( newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart);
+	if (newtsamp > 0 || newfch1 > 0 || newnchans > 0 || newfoff > 0 || newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart,newtsamp, newfch1, newfoff, newnchans);
 
 	if(ntimezaps > 0 || nfreqzaps > 0)zap_em(file,timezaps,ntimezaps,fzaps,nfreqzaps,mean,sigma,zap_mode);
 	if(flipTime==1 || flipFreq==1) FLIP(file,outfile,flipTime,flipFreq); 	
@@ -303,7 +336,7 @@ int main (int argc, char** argv){
 }
 
 
-void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart){
+void fix_header(FILE* file, char* newname, double newra, double newdec, int newibeam, int newnbeams, double newtstart, double newtsamp, double newfch1, double newfoff, int newnchans){
 	int newlen;
 	int hdr_len;
 	char* hdr_arr;
@@ -355,6 +388,16 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 
 
 		}
+
+/*
+
+	newfch1=-5;
+    newfoff=-5;
+    
+    double newtsamp, double newfch1, double newfoff, int newnchans
+    
+*/
+
 		memcpy(buf,ptr,7);
 		buf[7]='\0';
 		if(newra < 900000000 && strcmp(buf,"src_raj")==0){
@@ -371,6 +414,7 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new dec = '%lf'\n",newdec);
 			*((double*)(ptr)) = newdec;
 		}
+		memcpy(buf,ptr,6);
 		buf[6]='\0';
 		if(newtstart < 900000000 && strcmp(buf,"tstart")==0){
 			ptr+=6;
@@ -379,6 +423,20 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new tstart = '%lf'\n",newtstart);
 			*((double*)(ptr)) = newtstart;
 		}
+		if(newnbeams >= 0 && strcmp(buf,"nbeams")==0){
+			ptr+=6;
+			an_int = *((int*)(ptr));
+			printf("old nbeams = '%d'\n",an_int);
+			printf("new nbeams = '%d'\n",newnbeams);
+			*((int*)(ptr)) = newnbeams;
+		}
+		if(newnchans > 0 && strcmp(buf,"nchans")==0){
+			ptr+=6;
+			an_int = *((int*)(ptr));
+			printf("old nchans = '%d'\n",an_int);
+			printf("new nchans = '%d'\n",newnchans);
+			*((int*)(ptr)) = newnchans;
+		}		
 		memcpy(buf,ptr,5);
 		buf[5]='\0';
 		if(newibeam >= 0 && strcmp(buf,"ibeam")==0){
@@ -387,16 +445,30 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("old ibeam = '%d'\n",an_int);
 			printf("new ibeam = '%d'\n",newibeam);
 			*((int*)(ptr)) = newibeam;
-		}
-		memcpy(buf,ptr,6);
-		buf[6]='\0';
-		if(newnbeams >= 0 && strcmp(buf,"nbeams")==0){
-			ptr+=6;
-			an_int = *((int*)(ptr));
-			printf("old nbeams = '%d'\n",an_int);
-			printf("new nbeams = '%d'\n",newnbeams);
-			*((int*)(ptr)) = newnbeams;
-		}
+		}		
+		if(newtsamp > 0 && strcmp(buf,"tsamp")==0){
+			ptr+=5;
+			a_double = *((double*)(ptr));
+			printf("old tsamp = '%lf'\n",a_double);
+			printf("new tsamp = '%lf'\n",newtsamp);
+			*((double*)(ptr)) = newtsamp;
+		}	
+		memcpy(buf,ptr,4);
+		buf[4]='\0';		
+		if(newfch1 > 0 && strcmp(buf,"fch1")==0){
+			ptr+=4;
+			a_double = *((double*)(ptr));
+			printf("old fch1 = '%lf'\n",a_double);
+			printf("new fch1 = '%lf'\n",newfch1);
+			*((double*)(ptr)) = newfch1;
+		}			
+		if(newfoff > 0 && strcmp(buf,"foff")==0){
+			ptr+=4;
+			a_double = *((double*)(ptr));
+			printf("old foff = '%lf'\n",a_double);
+			printf("new off = '%lf'\n",newfoff);
+			*((double*)(ptr)) = newfoff;
+		}			
 		ptr++;
 	}
 
