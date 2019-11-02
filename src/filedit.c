@@ -33,19 +33,21 @@ void print_usage(){
 	printf("--dec,-d {dec}        : modify the dec to {dec}. in form ddmmss.xxx \n");
 	printf("--src-name,-n {str}   : modify the source name to {name}.\n");
 	printf("--tstart,-T {d}       : modify the start mjd.\n");
-	printf("--tsamp,-s            : modify the sample time.\n"); 
-	printf("--nchans,-c           : modify the number of channels.\n"); 
-	printf("--fch1,-f             : modify the frequency of channel 1.\n"); 
-	printf("--foff,-w             : modify the spectral bin width.\n"); 
+	printf("--tsamp,-i {d}        : modify the sample time.\n"); 
+	printf("--nchans,-c {i}       : modify the number of channels.\n"); 
+	printf("--fch1,-f {d}         : modify the frequency of channel 1.\n"); 
+	printf("--foff,-w {d}         : modify the spectral bin width.\n"); 
 	printf("--beam,-b {i}         : modify the beam number to {i}\n");
 	printf("--nbeams,-B {i}       : modify number of beams to {i}\n");
 	printf("--flipFreq,-F	      : Reverse order of frequency order (only 8-bit)\n");
 	printf("--flipTime,-N	      : Reverse order of time samples (only 8-bit)\n");
 	printf("\nOther options:\n");
 	printf("--time-zap,-t \"s e\" : 'zap' samples between 's' and 'e'\n");
-	printf("--replace-gaussian,-G : Replace zapped Gaussian random number generator\n");
+	printf("--replace-gaussian,-G : Replace zapped with Gaussian noise\n");
 	printf("--replace-samples,-S  : Replace zapped with random samples (default)\n");
 	printf("--replace-zero,-Z     : Replace zapped with zeros\n");
+	printf("--mean,-m {d}         : Specify mean for Gaussian noise\n");
+	printf("--sigma,-s {d}        : Specify sigma (std dev) for Gaussian noise\n");	
 	printf("\n");
 }
 
@@ -135,7 +137,7 @@ int main (int argc, char** argv){
 	long_opt[long_opt_idx].name = "tsamp";
 	long_opt[long_opt_idx].has_arg = required_argument;
 	long_opt[long_opt_idx].flag = NULL;
-	long_opt[long_opt_idx++].val = 's';
+	long_opt[long_opt_idx++].val = 'i';
 	
 	long_opt[long_opt_idx].name = "nchans";
 	long_opt[long_opt_idx].has_arg = required_argument;
@@ -226,6 +228,18 @@ int main (int argc, char** argv){
 						break;
 					case 'd':
 						newdec=atof(optarg);
+						break;
+					case 'i':
+						newtsamp=atof(optarg)
+						break;
+					case 'c':
+						newnchan=atoi(optarg)
+						break;
+					case 'f':
+						newfch1=atof(optarg)
+						break;
+					case 'w':
+						newfoff=atof(optarg)
 						break;
 					case 'n':
 						strcpy(newname,optarg);
