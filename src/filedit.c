@@ -33,10 +33,10 @@ void print_usage(){
 	printf("--dec,-d {dec}        : modify the dec to {dec}. in form ddmmss.xxx \n");
 	printf("--src-name,-n {str}   : modify the source name to {name}.\n");
 	printf("--tstart,-T {d}       : modify the start mjd.\n");
-	printf("--tsamp,-s            : modify the sample time.\n"); \\NEEDTOADD DOUBLE
-	printf("--nchans,-c           : modify the number of channels.\n"); \\NEEDTOADD integer
-	printf("--fch1,-f             : modify the frequency of channel 1.\n"); \\NEEDTOADD DOUBLE 
-	printf("--foff,-w             : modify the spectral bin width.\n"); \\NEEDTOADD DOUBLE
+	printf("--tsamp,-s            : modify the sample time.\n"); 
+	printf("--nchans,-c           : modify the number of channels.\n"); 
+	printf("--fch1,-f             : modify the frequency of channel 1.\n"); 
+	printf("--foff,-w             : modify the spectral bin width.\n"); 
 	printf("--beam,-b {i}         : modify the beam number to {i}\n");
 	printf("--nbeams,-B {i}       : modify number of beams to {i}\n");
 	printf("--flipFreq,-F	      : Reverse order of frequency order (only 8-bit)\n");
