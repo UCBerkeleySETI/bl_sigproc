@@ -97,7 +97,7 @@ int main (int argc, char** argv){
 	newtsamp=-5;
 	newfch1=-5;
     newnchans=-5;
-    newfoff=-5;
+    newfoff=900000001;
     
 	long_opt[long_opt_idx].name = "help";
 	long_opt[long_opt_idx].has_arg = no_argument;
@@ -342,7 +342,7 @@ int main (int argc, char** argv){
 		exit(-5);
 	}
 
-	if (newtsamp > 0 || newfch1 > 0 || newnchans > 0 || newfoff > 0 || newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart,newtsamp, newfch1, newfoff, newnchans);
+	if (newtsamp > 0 || newfch1 > 0 || newnchans > 0 || newfoff < 900000000 || newname[0]!='\0' || newra < 900000000 || newdec < 900000000 || newibeam >= 0 || newnbeams >= 0 || newtstart < 900000000)fix_header(file,newname,newra,newdec,newibeam,newnbeams,newtstart,newtsamp, newfch1, newfoff, newnchans);
 
 	if(ntimezaps > 0 || nfreqzaps > 0)zap_em(file,timezaps,ntimezaps,fzaps,nfreqzaps,mean,sigma,zap_mode);
 	if(flipTime==1 || flipFreq==1) FLIP(file,outfile,flipTime,flipFreq); 	
@@ -467,7 +467,7 @@ void fix_header(FILE* file, char* newname, double newra, double newdec, int newi
 			printf("new fch1 = '%lf'\n",newfch1);
 			*((double*)(ptr)) = newfch1;
 		}			
-		if(newfoff > 0 && strcmp(buf,"foff")==0){
+		if(newfoff < 900000000 && strcmp(buf,"foff")==0){
 			ptr+=4;
 			a_double = *((double*)(ptr));
 			printf("old foff = '%lf'\n",a_double);
