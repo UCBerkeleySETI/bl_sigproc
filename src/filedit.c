@@ -230,16 +230,16 @@ int main (int argc, char** argv){
 						newdec=atof(optarg);
 						break;
 					case 'i':
-						newtsamp=atof(optarg)
+						newtsamp=atof(optarg);
 						break;
 					case 'c':
-						newnchan=atoi(optarg)
+						newnchan=atoi(optarg);
 						break;
 					case 'f':
-						newfch1=atof(optarg)
+						newfch1=atof(optarg);
 						break;
 					case 'w':
-						newfoff=atof(optarg)
+						newfoff=atof(optarg);
 						break;
 					case 'n':
 						strcpy(newname,optarg);
