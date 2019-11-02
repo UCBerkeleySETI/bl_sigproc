@@ -233,7 +233,7 @@ int main (int argc, char** argv){
 						newtsamp=atof(optarg);
 						break;
 					case 'c':
-						newnchan=atoi(optarg);
+						newnchans=atoi(optarg);
 						break;
 					case 'f':
 						newfch1=atof(optarg);
