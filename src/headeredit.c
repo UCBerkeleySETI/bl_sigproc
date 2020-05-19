@@ -31,8 +31,10 @@ void headeredit_help() /*includefile*/
   puts("-nbits <int>         - set number of bits per sample");
   puts("-src_raj <double>    - set RA (J2000, HHMMSS.ssss)");
   puts("-src_dej <double>    - set DEC (J2000, DDMMSS.ssss)");  
+  puts("-telescope_id <int>  - set Telescope ID as an integer");
   puts("");
 }
+
 main(int argc, char *argv[]) 
 {
 	FILE *fileptr;
@@ -92,7 +94,9 @@ i=2;
 			} else if (strings_equal(argv[i],"-nbits")) {
 				nbits = (int) strtol(argv[++i], NULL, 10);
 				if (move_to_keyword(fileptr, "nbits")) fwrite(&nbits,sizeof(int),1,fileptr);  
-
+            } else if (strings_equal(argv[i],"-telescope_id")) {
+                telescope_id = (int) strtol(argv[++i], NULL, 10);
+                if (move_to_keyword(fileptr, "telescope_id")) fwrite(&telescope_id,sizeof(int),1,fileptr);
 			} else if (strings_equal(argv[i],"-src_raj")) {
 				src_raj=strtod(argv[++i], NULL);
 				if (move_to_keyword(fileptr, "src_raj")) fwrite(&src_raj,sizeof(double),1,fileptr);  
