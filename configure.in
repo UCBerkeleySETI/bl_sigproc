@@ -36,7 +36,7 @@ if test -n "${CXXFLAGS}"; then
 fi
 AC_PROG_CXX
 if test X$user_set_cxxflags != Xyes; then
-	CXXFLAGS="-O2"
+	CXXFLAGS="-O2 -fcommon"
 fi
 
 
@@ -51,8 +51,8 @@ MJK_LIB_PSRXML
 
 AX_OPENMP([have_openmp=yes],[have_openmp=no])
 if test X$have_openmp == Xyes; then
-	CFLAGS="$CFLAGS $OPENMP_CFLAGS -DHAVE_OPENMP"
-	CXXFLAGS="$CXXFLAGS $OPENMP_CFLAGS -DHAVE_OPENMP"
+	CFLAGS="$CFLAGS $OPENMP_CFLAGS -DHAVE_OPENMP -fcommon"
+	CXXFLAGS="$CXXFLAGS $OPENMP_CFLAGS -DHAVE_OPENMP -fcommon"
 fi
 
 
