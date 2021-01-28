@@ -13,6 +13,7 @@ http://www.pulsarastronomy.net/wiki/Software/PSRSoft
 Prerequisites
 ==============
 To compile from the source distribution, you need the following tools on a modern *buntu system (Ubuntu, Xubuntu, etc.):
+* csh                  C-shell peer of bash and sh
 * autoconf             automatic configure script builder
 * automake             Tool for generating GNU Standards-compliant Makefiles
 * libcfitsio-dev       library for I/O with FITS format data files (development files)
