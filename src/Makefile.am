@@ -6,6 +6,9 @@ noinst_LIBRARIES=libsigproc.a
 
 BUILT_SOURCES=sigproc.h
 
+AM_CFLAGS = -fcommon
+AM_CXXFLAGS = -fcommon
+
 AM_FFLAGS = -fno-second-underscore
 INCLUDES=.
 
