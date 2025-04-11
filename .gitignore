@@ -8,8 +8,10 @@ autoconf/ltversion.m4
 autoconf/lt~obsolete.m4
 autom4te.cache/
 config.h.in
+config.h.in~
 config/
 configure
+configure~
 src/Makefile.in
 
 # configure (and friends) generated files
@@ -28,6 +30,7 @@ src/accn
 src/ahunt
 src/bandpass
 src/barycentre
+src/best
 src/blanker
 src/chaninfo
 src/chop_fil
@@ -40,15 +43,19 @@ src/depolyco
 src/dice
 src/downsample
 src/extract
+src/extragplot
 src/fake
 src/ffa
 src/filedit
 src/filterbank
+src/filterbank_mkheader
 src/filterbankfe
 src/flatten
 src/flux
 src/fold
 src/foldsignals
+src/getpulse
+src/giant
 src/grey
 src/header
 src/headeredit
@@ -57,19 +64,26 @@ src/libsigproc.a
 src/makePsrXml
 src/makedummy
 src/monitor
+src/peak
+src/pgplotter
+src/plotpulses
 src/polyco2period
 src/postproc
 src/profile
+src/quickgplot
 src/quicklook
+src/quickplot
 src/readchunk
 src/reader
 src/seek
 src/shredder
 src/sigproc.h
 src/snrdm
+src/spec
 src/splice
 src/splice2
 src/splitter
 src/step
 src/sum_fil
 src/tree
+src/tune
