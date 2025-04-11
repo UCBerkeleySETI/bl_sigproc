@@ -88,7 +88,7 @@ char *telescope_name (int telescope_id) /*includefile*/
     strcpy(string,"???????"); 
     break;
   }
-  telescope=(char *) malloc(strlen(string));
+  telescope=(char *) malloc(strlen(string)+1);
   strcpy(telescope,string);
   return(telescope);
 }
@@ -142,7 +142,7 @@ char *backend_name (int machine_id) /*includefile*/
     strcpy(string,"?????");
     break;
   }
-  backend=(char *) malloc(strlen(string));
+  backend=(char *) malloc(strlen(string)+1);
   strcpy(backend,string);
   return(backend);
 }
@@ -175,7 +175,7 @@ char *data_category (int data_type) /*includefile*/
     strcpy(string,"unknown!");
     break;
   }
-  datatype=(char *) malloc(strlen(string));
+  datatype=(char *) malloc(strlen(string)+1);
   strcpy(datatype,string);
   return(datatype);
 }
