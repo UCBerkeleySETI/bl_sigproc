@@ -328,12 +328,12 @@ c      call pgtext(0.0,0.8,'File: '//filename(1:lst+1))
       call pgtext(0.0,0.7,text)
 
       text=' '
-      call gruser(user,l)
-      call grdate(text,m)
+c     call gruser(user,l)
+c     call grdate(text,m)
 
       call pgtext(0.0,0.5,comment)
       call pgscf(3)
-      call pgtext(0.0,0.35,'Hunter ID: '//user//' Date:  '//text)
+c     call pgtext(0.0,0.35,'Hunter ID: '//user//' Date:  '//text)
 
       call pgend
       
