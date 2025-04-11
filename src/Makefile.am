@@ -9,7 +9,7 @@ BUILT_SOURCES=sigproc.h
 AM_CFLAGS = -fcommon
 AM_CXXFLAGS = -fcommon
 
-AM_FFLAGS = -fno-second-underscore
+AM_FFLAGS = -fno-second-underscore -fallow-argument-mismatch
 INCLUDES=.
 
 f_headers=birdies.inc csamp.inc epnhdr.inc find_summary.inc folds.inc head.inc npts.inc peak.inc pulse.inc seek.inc time.inc vers.inc 
